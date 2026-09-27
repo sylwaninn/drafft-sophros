@@ -25,7 +25,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "~/components/ui/sidebar";
-import { navGroups, useVisibleNav } from "./nav";
+import { isActive, navGroups, useVisibleNav, type NavItem } from "./nav";
 import { useRoot } from "./root-data";
 
 const envBadge = {
@@ -55,10 +55,24 @@ function Count({ value }: { value: number }) {
   );
 }
 
+function NavEntry({ item, active, count }: { item: NavItem; active: boolean; count: number }) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+        <NavLink to={item.to} viewTransition prefetch="intent">
+          <item.icon />
+          <span>{item.label}</span>
+        </NavLink>
+      </SidebarMenuButton>
+      {count > 0 && <Count value={count} />}
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar() {
   const { staff, env, queues, theme } = useRoot();
   const nav = useVisibleNav();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const themeFetcher = useFetcher();
   const shownTheme = (themeFetcher.formData?.get("theme") as string | undefined) ?? theme;
 
@@ -85,29 +99,17 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {navGroups.map((group) => {
+        {[null, ...navGroups].map((group) => {
           const items = nav.filter((n) => n.group === group);
           if (!items.length) return null;
           return (
-            <SidebarGroup key={group}>
-              <SidebarGroupLabel>{group}</SidebarGroupLabel>
+            <SidebarGroup key={group ?? "top"}>
+              {group && <SidebarGroupLabel>{group}</SidebarGroupLabel>}
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {items.map((item) => {
-                    const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-                    const count = item.count?.(queues) ?? 0;
-                    return (
-                      <SidebarMenuItem key={item.to}>
-                        <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                          <NavLink to={item.to} viewTransition prefetch="intent">
-                            <item.icon />
-                            <span>{item.label}</span>
-                          </NavLink>
-                        </SidebarMenuButton>
-                        {count > 0 && <Count value={count} />}
-                      </SidebarMenuItem>
-                    );
-                  })}
+                  {items.map((item) => (
+                    <NavEntry key={item.to} item={item} active={isActive(item, pathname, search)} count={item.count?.(queues) ?? 0} />
+                  ))}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

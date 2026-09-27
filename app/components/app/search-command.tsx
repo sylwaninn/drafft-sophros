@@ -78,13 +78,13 @@ export function SearchCommand() {
               </CommandGroup>
             )}
             {!q.trim() &&
-              navGroups.map((group, i) => {
+              ([null, ...navGroups] as const).map((group, i) => {
                 const items = nav.filter((n) => n.group === group);
                 if (!items.length) return null;
                 return (
-                  <div key={group}>
+                  <div key={group ?? "top"}>
                     {i > 0 && <CommandSeparator />}
-                    <CommandGroup heading={group}>
+                    <CommandGroup heading={group ?? "Go to"}>
                       {items.map((item) => (
                         <CommandItem key={item.to} value={item.to} onSelect={() => go(item.to)}>
                           <item.icon />

@@ -12,7 +12,7 @@ import { Separator } from "~/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar";
 import { Spinner } from "~/components/ui/spinner";
 import { AppSidebar } from "~/components/app/app-sidebar";
-import { nav } from "~/components/app/nav";
+import { isActive, nav } from "~/components/app/nav";
 import { useRoot } from "~/components/app/root-data";
 import { SearchCommand } from "~/components/app/search-command";
 
@@ -22,9 +22,9 @@ export interface Crumb {
 }
 
 function Crumbs() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const matches = useMatches();
-  const section = nav.find((n) => (n.to === "/" ? pathname === "/" : pathname.startsWith(n.to)));
+  const section = nav.find((n) => isActive(n, pathname, search));
   const leaf = [...matches].reverse().find((m) => (m.handle as Crumb | undefined)?.crumb);
   const leafLabel = leaf ? (leaf.handle as Crumb).crumb!(leaf.loaderData) : null;
   const trail = [section && { label: section.label, to: section.to }, leafLabel && { label: leafLabel, to: pathname }].filter(Boolean) as {
