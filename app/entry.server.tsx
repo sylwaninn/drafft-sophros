@@ -5,6 +5,7 @@ import type { EntryContext, RouterContextProvider } from "react-router";
 import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
+import { getConfig } from "~/lib/.server/config";
 
 export const streamTimeout = 5_000;
 
@@ -38,6 +39,12 @@ export default async function handleRequest(
   }
 
   const dev = import.meta.env.DEV;
+  // Media hosts that aren't https (the local Storage, with the demo pictures and selfies).
+  const config = getConfig();
+  const plain = [config.supabaseUrl, config.demoMediaUrl, config.mediaUrl]
+    .filter((u): u is string => !!u && u.startsWith("http:"))
+    .map((u) => new URL(u).origin);
+  const media = ["'self'", "data:", "blob:", "https:", ...new Set(plain)].join(" ");
   responseHeaders.set("Content-Type", "text/html");
   responseHeaders.set(
     "Content-Security-Policy",
@@ -46,8 +53,8 @@ export default async function handleRequest(
       // Vite's dev server injects its client and HMR over a websocket.
       `script-src 'self' 'nonce-${nonce}'${dev ? " 'unsafe-inline'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "media-src 'self' https:",
+      `img-src ${media}`,
+      `media-src ${media}`,
       `connect-src 'self'${dev ? " ws: wss:" : ""}`,
       "font-src 'self'",
       "object-src 'none'",

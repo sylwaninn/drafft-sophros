@@ -1,9 +1,19 @@
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { CameraIcon, ChevronRightIcon, ScanFaceIcon, UserRoundSearchIcon } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
+import { Card } from "~/components/ui/card";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "~/components/ui/item";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { HoldControls } from "~/components/app/act";
+import { Nothing, Page, PageHeader, PersonAvatar, PersonLink, TimeAgo } from "~/components/app/bits";
+import { SelfieCompare } from "~/components/app/selfie-compare";
+import { QueueItem, QueueMotion } from "~/components/app/motion";
+import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query, signedUrl } from "~/lib/.server/db";
 import type { Person } from "~/lib/types";
-import { ActForm, Button, HoldForm, inputClass } from "~/components/actions";
-import { Badge, Card, Empty, MediaTile, Page, PersonLink, Time, useRoot } from "~/components/ui";
 import type { Route } from "./+types/verifications";
 
 interface Cause {
@@ -21,163 +31,170 @@ interface Queue {
 export async function loader({ context }: Route.LoaderArgs) {
   const staff = context.get(staffContext);
   const queue = await query<Queue>(staff, "admin_verifications");
-  // Selfies are only shown to moderators, through 5-minute links; each viewing is logged.
+  // Selfies are shown to moderators only, through 5-minute links; each viewing is logged.
   const selfies = can(staff, "moderator")
     ? await Promise.all(
         queue.selfies.map(async (s) => {
-          const paths = await query<{ path: string; createdAt: string }[]>(staff, "admin_selfies", { p_user: s.person.id, p_reason: "verification queue" });
-          const urls = await Promise.all(paths.slice(0, 3).map(async (p) => ({ url: await signedUrl("verification-selfies", p.path), createdAt: p.createdAt })));
-          return [s.person.id, urls] as const;
+          const paths = await query<{ path: string; createdAt: string }[]>(staff, "admin_selfies", {
+            p_user: s.person.id,
+            p_reason: "verification queue",
+          });
+          return [s.person.id, await Promise.all(paths.slice(0, 1).map((p) => signedUrl("verification-selfies", p.path)))] as const;
         }),
       )
     : [];
-  return { queue, selfies: Object.fromEntries(selfies) };
+  return { queue, selfies: Object.fromEntries(selfies) as Record<string, (string | null)[]> };
 }
 
-function CauseLine({ cause, since }: { cause: Cause | null; since: string }) {
-  return (
-    <p className="text-xs text-mute">
-      {cause?.note ?? "no reason recorded"}
-      {cause?.actor ? `, by ${cause.actor}` : ", automatic"}, held <Time value={since} />
-    </p>
-  );
+function cause(c: Cause | null) {
+  if (!c) return "No reason recorded";
+  return `${c.note ?? "No reason recorded"}${c.actor ? `, by ${c.actor}` : ", automatic"}`;
 }
 
 export default function Verifications({ loaderData: { queue, selfies } }: Route.ComponentProps) {
-  const { staff } = useRoot();
-  const moderator = can(staff, "moderator");
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const tab = params.get("tab") ?? "selfies";
   return (
-    <Page title="Verifications" subtitle="Accounts on hold waiting for a person. Oldest first.">
-      <div className="space-y-6">
-        <section>
-          <h2 className="mb-2 text-sm font-semibold">Selfies to compare ({queue.selfies.length})</h2>
+    <Page>
+      <PageHeader title="Verifications" description="Accounts on hold waiting for a person, oldest first." />
+      <Tabs value={tab} onValueChange={(t) => navigate(t === "selfies" ? "?" : `?tab=${t}`, { replace: true, preventScrollReset: true })}>
+        <TabsList>
+          <TabsTrigger value="selfies">
+            <ScanFaceIcon />
+            Selfies to compare
+            <Badge variant="secondary">{queue.selfies.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="reviews">
+            <UserRoundSearchIcon />
+            In review
+            <Badge variant="secondary">{queue.reviews.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="owed">
+            <CameraIcon />
+            Selfies owed
+            <Badge variant="secondary">{queue.waitingSelfie.length}</Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="selfies" className="mt-4 space-y-6">
           {queue.selfies.length === 0 ? (
-            <Card>
-              <Empty>No selfie waiting.</Empty>
-            </Card>
+            <Nothing title="No selfie to compare">When someone sends the selfie they owe, it lands here.</Nothing>
           ) : (
-            <div className="space-y-4">
-              {queue.selfies.map((s) => (
-                <Card key={s.person.id} title={<PersonLink person={s.person} />} aside={<>selfie sent <Time value={s.selfieAt} /></>}>
-                  <CauseLine cause={s.cause} since={s.since} />
-                  <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_16rem]">
-                    <div>
-                      <div className="mb-1 text-xs font-medium text-mute">Selfie</div>
-                      {moderator ? (
-                        (selfies[s.person.id] ?? []).map((sf, i) =>
-                          sf.url ? (
-                            <img key={i} src={sf.url} alt="Verification selfie" referrerPolicy="no-referrer" className="mb-2 aspect-[3/4] w-full rounded-lg bg-soft-2 object-cover" />
-                          ) : (
-                            <Empty key={i}>Selfie file missing.</Empty>
-                          ),
-                        )
-                      ) : (
-                        <Empty>Moderators only.</Empty>
-                      )}
-                    </div>
-                    <div>
-                      <div className="mb-1 text-xs font-medium text-mute">Profile photos</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {s.photos.map((p) => (
-                          <div key={p.key} className="relative">
-                            <MediaTile mediaKey={p.key} />
-                            {p.status !== "approved" && (
-                              <span className="absolute top-1 left-1">
-                                <Badge tone="warning">{p.status}</Badge>
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {moderator && <SelfieDecision user={s.person.id} />}
-                  </div>
-                </Card>
-              ))}
-            </div>
+            <SelfieQueue queue={queue} selfies={selfies} focus={params.get("case")} />
           )}
-        </section>
+        </TabsContent>
 
-        <section id="reviews" className="scroll-mt-4">
-          <h2 className="mb-2 text-sm font-semibold">Accounts in review ({queue.reviews.length})</h2>
-          <Card>
-            {queue.reviews.length === 0 ? (
-              <Empty>Nobody in review.</Empty>
-            ) : (
-              <ul className="divide-y divide-line">
+        <TabsContent value="reviews" className="mt-4">
+          {queue.reviews.length === 0 ? (
+            <Nothing title="Nobody in review" />
+          ) : (
+            <ItemGroup className="gap-3">
+              <QueueMotion>
                 {queue.reviews.map((r) => (
-                  <li key={r.person.id} className="grid gap-3 py-3 first:pt-0 last:pb-0 md:grid-cols-[1fr_22rem]">
-                    <div>
-                      <PersonLink person={r.person} />
-                      <div className="mt-1 ml-9">
-                        <CauseLine cause={r.cause} since={r.since} />
-                      </div>
-                    </div>
-                    <HoldForm user={r.person.id} current="review" />
-                  </li>
+                  <QueueItem key={r.person.id} id={r.person.id}>
+                    <Item variant="outline">
+                      <ItemContent>
+                        <ItemTitle>
+                          <PersonLink person={r.person} showHold={false} />
+                        </ItemTitle>
+                        <ItemDescription>
+                          {cause(r.cause)}. Held <TimeAgo value={r.since} />.
+                        </ItemDescription>
+                      </ItemContent>
+                      <ItemActions>
+                        <HoldControls user={r.person.id} name={r.person.name ?? ""} current="review" size="sm" />
+                      </ItemActions>
+                    </Item>
+                  </QueueItem>
                 ))}
-              </ul>
-            )}
-          </Card>
-        </section>
+              </QueueMotion>
+            </ItemGroup>
+          )}
+        </TabsContent>
 
-        <section>
-          <h2 className="mb-2 text-sm font-semibold">Selfies asked, not sent yet ({queue.waitingSelfie.length})</h2>
-          <Card>
-            {queue.waitingSelfie.length === 0 ? (
-              <Empty>Nobody owes a selfie.</Empty>
-            ) : (
-              <ul className="space-y-2">
-                {queue.waitingSelfie.map((w) => (
-                  <li key={w.person.id} className="flex flex-wrap items-center justify-between gap-2">
-                    <PersonLink person={w.person} />
-                    <CauseLine cause={w.cause} since={w.since} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </section>
-      </div>
+        <TabsContent value="owed" className="mt-4">
+          {queue.waitingSelfie.length === 0 ? (
+            <Nothing title="Nobody owes a selfie" />
+          ) : (
+            <Card className="py-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="pl-4">Account</TableHead>
+                    <TableHead>Why it was asked</TableHead>
+                    <TableHead className="pr-4 text-right">Asked</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {queue.waitingSelfie.map((w) => (
+                    <TableRow key={w.person.id}>
+                      <TableCell className="pl-4">
+                        <PersonLink person={w.person} showHold={false} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{cause(w.cause)}</TableCell>
+                      <TableCell className="pr-4 text-right">
+                        <TimeAgo value={w.since} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </Page>
   );
 }
 
-/** The three outcomes of a selfie check, each with its reason for the log. */
-function SelfieDecision({ user }: { user: string }) {
+/** The case in front (the oldest, or the one picked), and the ones waiting after it. */
+function SelfieQueue({ queue, selfies, focus }: { queue: Queue; selfies: Record<string, (string | null)[]>; focus: string | null }) {
+  const { staff } = useRoot();
+  const index = Math.max(
+    0,
+    queue.selfies.findIndex((s) => s.person.id === focus),
+  );
+  const current = queue.selfies[index];
+  const rest = queue.selfies.filter((_, i) => i !== index);
   return (
-    <div className="space-y-3">
-      <div className="text-xs font-medium text-mute">Decision</div>
-      <ActForm intent="hold" fields={{ user, state: "" }} resetOnSuccess>
-        {({ pending }) => (
-          <>
-            <input type="hidden" name="reason" value="selfie matches the photos" />
-            <Button tone="lime" pending={pending} className="w-full">
-              Same person: lift the hold
-            </Button>
-          </>
-        )}
-      </ActForm>
-      <ActForm intent="hold" fields={{ user, state: "selfie" }} resetOnSuccess className="space-y-1.5">
-        {({ pending }) => (
-          <>
-            <input name="reason" required placeholder="Why another one: blurry, face hidden" className={inputClass} />
-            <Button pending={pending} className="w-full">
-              Ask for another selfie
-            </Button>
-          </>
-        )}
-      </ActForm>
-      <ActForm intent="hold" fields={{ user, state: "banned" }} confirm="Ban this account? Its identities can't come back." resetOnSuccess className="space-y-1.5">
-        {({ pending }) => (
-          <>
-            <input name="reason" required placeholder="Why: not the person in the photos" className={inputClass} />
-            <Button tone="danger" pending={pending} className="w-full">
-              Not the same person: ban
-            </Button>
-          </>
-        )}
-      </ActForm>
-    </div>
+    <>
+      <QueueMotion>
+        <QueueItem key={current.person.id} id={current.person.id}>
+          <SelfieCompare
+            item={{ ...current, cause: cause(current.cause) }}
+            selfie={selfies[current.person.id]?.[0] ?? null}
+            position={index + 1}
+            total={queue.selfies.length}
+            canDecide={can(staff, "moderator")}
+          />
+        </QueueItem>
+      </QueueMotion>
+      {rest.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground">Waiting after this one</h2>
+          <ItemGroup className="gap-2">
+            {rest.map((s) => (
+              <Item key={s.person.id} variant="outline" size="sm" asChild>
+                <Link to={`?case=${s.person.id}`} replace preventScrollReset>
+                  <ItemMedia>
+                    <PersonAvatar person={s.person} className="size-8" />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>{s.person.name || "No name yet"}</ItemTitle>
+                    <ItemDescription>
+                      Selfie sent <TimeAgo value={s.selfieAt} />
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <ChevronRightIcon className="size-4 text-muted-foreground" />
+                  </ItemActions>
+                </Link>
+              </Item>
+            ))}
+          </ItemGroup>
+        </section>
+      )}
+    </>
   );
 }

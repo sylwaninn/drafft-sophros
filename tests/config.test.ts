@@ -25,7 +25,13 @@ describe("loadConfig", () => {
   });
 
   it("allows it locally", () => {
-    const config = loadConfig({ ...production, DRAFFT_ENV: "local", AUTH_MODE: "dev", DEV_STAFF_EMAIL: "Me@X.dev", SUPABASE_URL: "http://127.0.0.1:55421" });
+    const config = loadConfig({
+      ...production,
+      DRAFFT_ENV: "local",
+      AUTH_MODE: "dev",
+      DEV_STAFF_EMAIL: "Me@X.dev",
+      SUPABASE_URL: "http://127.0.0.1:55421",
+    });
     expect(config.auth).toEqual({ mode: "dev", email: "me@x.dev" });
   });
 

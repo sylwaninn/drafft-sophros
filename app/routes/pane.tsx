@@ -1,6 +1,7 @@
 // Pages render here, so an error in one of them keeps the navigation around it.
 import { isRouteErrorResponse, Outlet } from "react-router";
-import { Empty, Page } from "~/components/ui";
+import { OctagonAlertIcon } from "lucide-react";
+import { Nothing, Page } from "~/components/app/bits";
 import type { Route } from "./+types/pane";
 
 export default function Pane() {
@@ -17,8 +18,10 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     details = error.message;
   }
   return (
-    <Page title={title}>
-      <Empty>{details}</Empty>
+    <Page>
+      <Nothing icon={<OctagonAlertIcon />} title={title}>
+        {details}
+      </Nothing>
     </Page>
   );
 }

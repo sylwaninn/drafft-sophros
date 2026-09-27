@@ -1,0 +1,32 @@
+#!/bin/sh
+# Refuses commits on main and staging (they only change through pull requests), then checks the staged
+# files the way CI does: Prettier formatting and ESLint, on those files only (a second, not a full run).
+branch=$(git branch --show-current)
+case "$branch" in
+  main | staging)
+    echo "pre-commit: committing on $branch is forbidden. Create a branch: git switch -c feat/<name>" >&2
+    exit 1
+    ;;
+esac
+
+files=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$files" ] && exit 0
+
+# Files Prettier knows how to format, minus the ignored ones (it skips those itself).
+format=$(printf '%s\n' "$files" | grep -E '\.(ts|tsx|js|jsx|mjs|cjs|json|jsonc|css|md|yml|yaml)$' || true)
+if [ -n "$format" ]; then
+  if ! printf '%s\n' "$format" | xargs pnpm exec prettier --check --ignore-unknown >/dev/null 2>&1; then
+    echo "pre-commit: formatting differs from Prettier. Run: pnpm format, then stage again." >&2
+    printf '%s\n' "$format" | xargs pnpm exec prettier --list-different --ignore-unknown >&2 || true
+    exit 1
+  fi
+fi
+
+code=$(printf '%s\n' "$files" | grep -E '\.(ts|tsx|js|mjs)$' || true)
+if [ -n "$code" ]; then
+  if ! printf '%s\n' "$code" | xargs pnpm exec eslint --max-warnings 0 --no-warn-ignored; then
+    echo "pre-commit: ESLint found problems in the staged files (above)." >&2
+    exit 1
+  fi
+fi
+exit 0

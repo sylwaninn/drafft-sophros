@@ -1,10 +1,22 @@
-import { Link, useSearchParams } from "react-router";
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
+import { MessagesSquareIcon, ShieldAlertIcon } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
+import { Field, FieldLabel } from "~/components/ui/field";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "~/components/ui/sheet";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { ReasonDialog } from "~/components/app/act";
+import { ConversationDrawer } from "~/components/app/conversation-drawer";
+import { Facts, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
+import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
 import type { Report } from "~/lib/types";
-import { ActForm, Button, inputClass } from "~/components/actions";
-import { Badge, Card, Empty, Page, PersonLink, Tabs, Time, useRoot } from "~/components/ui";
 import type { Route } from "./+types/reports";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -12,7 +24,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return { reports: await query<Report[]>(context.get(staffContext), "admin_reports", { p_open: open, p_limit: 100 }) };
 }
 
-const reasons: Record<string, string> = {
+export const reasons: Record<string, string> = {
   fake: "Fake profile",
   inappropriate_photos: "Inappropriate photos",
   harassment: "Harassment",
@@ -23,78 +35,161 @@ const reasons: Record<string, string> = {
 
 export default function Reports({ loaderData: { reports } }: Route.ComponentProps) {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const all = params.get("status") === "all";
-  const { staff } = useRoot();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const selected = reports.find((r) => r.id === openId) ?? null;
+
   return (
-    <Page title="Reports" subtitle="What members reported. Underage, or 3 people in 30 days, already put the account in review.">
-      <Tabs
-        items={[
-          { label: "Open", to: "?", active: !all },
-          { label: "All", to: "?status=all", active: all },
-        ]}
+    <Page>
+      <PageHeader
+        title="Reports"
+        description="What members reported. Underage, or 3 reporters in 30 days, already put the account in review."
+        actions={
+          <Tabs value={all ? "all" : "open"} onValueChange={(v) => navigate(v === "all" ? "?status=all" : "?", { replace: true })}>
+            <TabsList>
+              <TabsTrigger value="open">Open</TabsTrigger>
+              <TabsTrigger value="all">All</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        }
       />
       {reports.length === 0 ? (
-        <Card>
-          <Empty>No open report.</Empty>
-        </Card>
+        <Nothing title="No open report">Reports from the app land here.</Nothing>
       ) : (
-        <div className="space-y-3">
-          {reports.map((r) => (
-            <Card key={r.id}>
-              <div className="grid gap-4 md:grid-cols-[1fr_24rem]">
-                <div className="min-w-0 space-y-2 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge tone={r.reason === "underage" ? "negative" : "warning"}>{reasons[r.reason] ?? r.reason}</Badge>
-                    <Time value={r.createdAt} />
-                    {(r.reportedCount30d ?? 0) > 1 && <Badge tone="negative">{r.reportedCount30d} people in 30 days</Badge>}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-mute">Reported</span>
+        <Card className="py-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-4">Reason</TableHead>
+                <TableHead>Reported</TableHead>
+                <TableHead>By</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead>Received</TableHead>
+                <TableHead className="pr-4 text-right">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reports.map((r) => (
+                <TableRow
+                  key={r.id}
+                  className="cursor-pointer"
+                  onClick={() => setOpenId(r.id)}
+                  data-state={openId === r.id ? "selected" : undefined}
+                >
+                  <TableCell className="pl-4">
+                    <Badge variant={r.reason === "underage" ? "destructive" : "secondary"}>{reasons[r.reason] ?? r.reason}</Badge>
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <PersonLink person={r.reported} />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-mute">By</span>
-                    <PersonLink person={r.reporter} size={22} />
-                  </div>
-                  {r.details && <p className="rounded-lg bg-soft p-3 whitespace-pre-wrap">{r.details}</p>}
-                  {r.match && can(staff, "moderator") && (
-                    <Link to={`/conversations/${r.match}?suggest=${encodeURIComponent(`report ${r.id.slice(0, 8)}`)}`} className="inline-block underline">
-                      Read their conversation
-                    </Link>
-                  )}
-                  {r.handledAt && (
-                    <p className="text-xs text-mute">
-                      Closed <Time value={r.handledAt} /> by {r.handledBy}: {r.resolution}
-                    </p>
-                  )}
-                </div>
-                {!r.handledAt && can(staff, "moderator") && r.reported && <Resolve report={r} />}
-              </div>
-            </Card>
-          ))}
-        </div>
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <PersonLink person={r.reporter} showHold={false} />
+                  </TableCell>
+                  <TableCell className="max-w-72 truncate text-muted-foreground">{r.details}</TableCell>
+                  <TableCell>
+                    <TimeAgo value={r.createdAt} />
+                  </TableCell>
+                  <TableCell className="pr-4 text-right">
+                    {r.handledAt ? (
+                      <Badge variant="outline">Closed</Badge>
+                    ) : (r.reportedCount30d ?? 0) > 1 ? (
+                      <Badge variant="destructive">{r.reportedCount30d} reporters</Badge>
+                    ) : (
+                      <Badge>Open</Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       )}
+      <ReportSheet report={selected} onClose={() => setOpenId(null)} />
     </Page>
   );
 }
 
-function Resolve({ report }: { report: Report }) {
+function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: () => void }) {
+  const { staff } = useRoot();
+  const [hold, setHold] = useState("none");
+  const [reading, setReading] = useState<string | null>(null);
+  const moderator = can(staff, "moderator");
   return (
-    <ActForm intent="report" fields={{ report: report.id, user: report.reported?.id }} className="space-y-2">
-      {({ pending }) => (
-        <>
-          <textarea name="resolution" required rows={2} maxLength={1000} placeholder="What you found and did" className={inputClass} />
-          <select name="hold" defaultValue="" className={inputClass} aria-label="Hold on the reported account">
-            <option value="">No hold</option>
-            <option value="review">Hold for review</option>
-            <option value="selfie">Ask for a selfie</option>
-            <option value="banned">Ban</option>
-          </select>
-          <Button tone="primary" pending={pending}>
-            Close the report
-          </Button>
-        </>
-      )}
-    </ActForm>
+    <>
+      <ConversationDrawer matchId={reading} from={r ? `report ${r.id.slice(0, 8)}` : "report"} onClose={() => setReading(null)} />
+      <Sheet open={!!r} onOpenChange={(open) => !open && onClose()}>
+        <SheetContent className="sm:max-w-lg">
+          {r && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <ShieldAlertIcon className="size-4" />
+                  {reasons[r.reason] ?? r.reason}
+                </SheetTitle>
+                <SheetDescription>
+                  Received <TimeAgo value={r.createdAt} exact />
+                </SheetDescription>
+              </SheetHeader>
+              <div className="grid gap-6 overflow-y-auto px-4">
+                <Facts
+                  rows={[
+                    ["Reported", <PersonLink key="d" person={r.reported} />],
+                    ["By", <PersonLink key="r" person={r.reporter} showHold={false} />],
+                    ["Reporters, 30 days", String(r.reportedCount30d ?? 1)],
+                  ]}
+                />
+                {r.details && <blockquote className="border-l-2 pl-4 text-sm whitespace-pre-wrap italic">{r.details}</blockquote>}
+                {r.match && moderator && (
+                  <Button variant="outline" onClick={() => setReading(r.match ?? null)}>
+                    <MessagesSquareIcon data-icon="inline-start" />
+                    Read their conversation
+                  </Button>
+                )}
+                {r.handledAt && (
+                  <Facts
+                    rows={[
+                      ["Closed", <TimeAgo key="c" value={r.handledAt} />],
+                      ["By", r.handledBy],
+                      ["Resolution", r.resolution],
+                    ]}
+                  />
+                )}
+              </div>
+              {!r.handledAt && moderator && r.reported && (
+                <SheetFooter>
+                  <ReasonDialog
+                    intent="report"
+                    fields={{ report: r.id, user: r.reported.id, hold: hold === "none" ? "" : hold }}
+                    reasonName="resolution"
+                    label="Resolution"
+                    placeholder="What you found and did"
+                    title="Close the report"
+                    description="The resolution goes to the audit log; the hold, if any, applies at once."
+                    submit={hold === "banned" ? "Ban and close" : "Close the report"}
+                    trigger={<Button className="w-full">Close the report</Button>}
+                  >
+                    <Field>
+                      <FieldLabel>Hold on {r.reported.name ?? "the account"}</FieldLabel>
+                      <Select value={hold} onValueChange={setHold}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No hold</SelectItem>
+                          <SelectItem value="review">Hold for review</SelectItem>
+                          <SelectItem value="selfie">Ask for a selfie</SelectItem>
+                          <SelectItem value="banned">Ban</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </ReasonDialog>
+                </SheetFooter>
+              )}
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
