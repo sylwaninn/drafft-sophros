@@ -56,7 +56,7 @@
         "MEDIA_PUBLIC_URL": "https://pub-f4b77604ea6f42188c3ba8da914a6a16.r2.dev",
         "ACCESS_TEAM_DOMAIN": "https://drafft-sophros.cloudflareaccess.com",
         // Access application "sophros" (production) > Application Audience (AUD) Tag
-        "ACCESS_AUD": "",
+        "ACCESS_AUD": "5b71180cae071abc0d89edfae898f0054643e4821ab1e67102400e43773efc3c",
         "DEMO_MEDIA_URL": "",
       },
     },
