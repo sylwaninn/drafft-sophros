@@ -3,7 +3,7 @@
 #   pull request     → PR title, quality (types, lint, format, tests, build), bundles for both
 #                      environments, security (dependencies, secrets, workflows)
 #   push to staging  → the same checks, then deploy sophros-staging and smoke-test it behind Access
-#   push to main     → the same checks, then deploy sophros-production (once PRODUCTION_ENABLED=true)
+#   push to main     → the same checks, then deploy sophros-production and smoke-test it behind Access
 #
 # Flow: feature branch → PR into staging → PR from staging into main.
 # Wrangler needs the secret CLOUDFLARE_API_TOKEN and the variable CLOUDFLARE_ACCOUNT_ID. The Workers'
@@ -157,7 +157,7 @@ jobs:
 
   deploy-production:
     name: deploy production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PRODUCTION_ENABLED == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [quality, bundle, security]
     runs-on: ubuntu-latest
     timeout-minutes: 10
