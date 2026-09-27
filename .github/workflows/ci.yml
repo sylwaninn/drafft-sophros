@@ -39,7 +39,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - name: Secrets (whole history)
-        run: docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.28.0 git --no-banner --redact .
+        run: docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.28.0 git --no-banner --config .gitleaks.toml --redact .
 
   staging:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
