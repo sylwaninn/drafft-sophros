@@ -76,7 +76,7 @@ new account on the same iPhone, a selfie to compare, reports, flagged chat photo
 never show in the app's Discover. Their pictures are stock placeholders (i.pravatar.cc portraits, picsum.photos
 scenes) copied to the local Storage, and their conversations are canned (Stream isn't needed locally).
 
-Checks: `pnpm typecheck && pnpm test && pnpm build`.
+Checks, as CI runs them: `pnpm verify` (types, lint, format, tests, build); `pnpm format` fixes formatting.
 
 ## Deploying
 
@@ -98,10 +98,22 @@ Per environment (`staging` first, then `production`):
    pnpm exec wrangler secret put STREAM_API_SECRET --env staging
    ```
    Give sophros its own secret key (Supabase > Settings > API keys) so it can be revoked alone.
-4. Deploys run from GitHub Actions (`.github/workflows/ci.yml`): every merge to `main` ships staging, a
-   `v*` tag ships production. The repository needs the secret `CLOUDFLARE_API_TOKEN` (Cloudflare > My
-   Profile > API Tokens > template "Edit Cloudflare Workers", this account and the `getdrafft.com` zone)
-   and the variable `CLOUDFLARE_ACCOUNT_ID`. By hand, from a machine logged in with `wrangler login`:
+4. Deploys run from GitHub Actions (`.github/workflows/ci.yml`), never from a laptop:
+
+   | Branch    | Deploys                                                                 | How it changes                      |
+   | --------- | ----------------------------------------------------------------------- | ----------------------------------- |
+   | `staging` | `sophros-staging`                                                       | pull requests from feature branches |
+   | `main`    | `sophros-production` (once the variable `PRODUCTION_ENABLED` is `true`) | pull requests from `staging`        |
+
+   Every pull request runs: its title (`type(scope): description`), quality (types, ESLint with React hooks
+   and accessibility rules, Prettier, tests, build), a dry-run bundle of the Worker for both environments,
+   and security (`pnpm audit`, gitleaks over the whole history, actionlint, zizmor, shellcheck). A deploy
+   then smoke-tests the domain: it must redirect to Access, never answer without it. Actions are pinned to a
+   commit and Dependabot proposes updates weekly, into `staging`.
+
+   The repository needs the secret `CLOUDFLARE_API_TOKEN` (Cloudflare > My Profile > API Tokens > template
+   "Edit Cloudflare Workers", this account and the `getdrafft.com` zone) and the variable
+   `CLOUDFLARE_ACCOUNT_ID`. By hand, in an emergency, from a machine logged in with `wrangler login`:
    `pnpm run deploy:staging`, or `pnpm run deploy:production` (asks to type `production`).
 
 The Worker is only reachable on its custom domain, behind Access. A request without a valid Access token

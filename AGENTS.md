@@ -14,7 +14,10 @@ React Router and Workers APIs move fast: read `node_modules/react-router/docs/` 
 - GitHub: [.agents/rules/github.md](.agents/rules/github.md)
 - Git hooks, once per clone: `git config core.hooksPath .agents/git-hooks`
 
-Verify before committing: `pnpm typecheck && pnpm test && pnpm build`.
+Verify before committing: `pnpm verify` (types, ESLint, Prettier, tests, build), as CI does.
+
+Branches: feature branch → pull request into `staging` (deploys staging) → pull request from `staging`
+into `main` (deploys production). Nobody pushes to `staging` or `main` directly; the pre-push hook refuses.
 
 ## Safety
 
