@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
+import { EyeIcon, FlagIcon } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
+import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Checkbox } from "~/components/ui/checkbox";
+import { Label } from "~/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import { ActButton } from "~/components/app/act";
+import { MediaTile, Nothing, Page, PageHeader, Panel, PersonLink, TimeAgo } from "~/components/app/bits";
+import { QueueItem, QueueMotion } from "~/components/app/motion";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import type { Flag, Person } from "~/lib/types";
-import { ActForm, Button } from "~/components/actions";
-import { Badge, Card, Empty, MediaTile, Page, PersonLink, Table, Tabs, Time, cx } from "~/components/ui";
+import { cn } from "~/lib/utils";
 import type { Route } from "./+types/flags";
 
 interface FlaggedUser {
@@ -20,106 +29,127 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const open = new URL(request.url).searchParams.get("status") !== "all";
   const [flags, users] = await Promise.all([
     query<Flag[]>(staff, "admin_flags", { p_open: open, p_limit: 120 }),
-    query<FlaggedUser[]>(staff, "admin_flagged_users", { p_limit: 30 }),
+    query<FlaggedUser[]>(staff, "admin_flagged_users", { p_limit: 20 }),
   ]);
   return { flags, users };
 }
 
 export default function Flags({ loaderData: { flags, users } }: Route.ComponentProps) {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const all = params.get("status") === "all";
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const open = flags.filter((f) => !f.reviewed_at);
-  const toggle = (id: number) =>
+  const chosen = [...selected].filter((id) => open.some((f) => f.id === id));
+  const toggle = (id: number, on: boolean) =>
     setSelected((s) => {
       const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (on) next.add(id);
+      else next.delete(id);
       return next;
     });
 
   return (
-    <Page
-      title="Flagged media"
-      subtitle="Chat and profile photos the silent check found against the guidelines (red) or borderline (yellow). Nobody was told."
-    >
-      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs
-              items={[
-                { label: "To look at", to: "?", active: !all },
-                { label: "All", to: "?status=all", active: all },
-              ]}
-            />
-            {open.length > 0 && (
-              <ActForm intent="flags" fields={{ id: [...selected].map(String) }} className="mb-4 flex items-center gap-2">
-                {({ pending }) => (
-                  <>
-                    <button type="button" className="text-sm text-body underline" onClick={() => setSelected(selected.size ? new Set() : new Set(open.map((f) => f.id)))}>
-                      {selected.size ? "Clear" : "Select all"}
-                    </button>
-                    <Button tone="primary" pending={pending} disabled={!selected.size} onClick={() => setTimeout(() => setSelected(new Set()))}>
-                      Looked at {selected.size || ""}
-                    </Button>
-                  </>
-                )}
-              </ActForm>
-            )}
-          </div>
+    <Page>
+      <PageHeader
+        title="Flagged media"
+        description="Chat and profile photos the silent check found against the guidelines, or borderline. Nobody was told; look, then act on the account if needed."
+        actions={
+          <ToggleGroup type="single" variant="outline" size="sm" value={all ? "all" : "open"} onValueChange={(v) => v && navigate(v === "all" ? "?status=all" : "?", { replace: true })}>
+            <ToggleGroupItem value="open">To look at</ToggleGroupItem>
+            <ToggleGroupItem value="all">All</ToggleGroupItem>
+          </ToggleGroup>
+        }
+      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="space-y-4">
+          {open.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="select-all"
+                  checked={chosen.length === open.length ? true : chosen.length ? "indeterminate" : false}
+                  onCheckedChange={(on) => setSelected(on === true ? new Set(open.map((f) => f.id)) : new Set())}
+                />
+                <Label htmlFor="select-all" className="font-normal text-muted-foreground">
+                  {chosen.length ? `${chosen.length} selected` : "Select all"}
+                </Label>
+              </div>
+              <ActButton intent="flags" fields={{ id: chosen }} size="sm" disabled={!chosen.length} onClick={() => setTimeout(() => setSelected(new Set()))}>
+                <EyeIcon data-icon="inline-start" />
+                Mark looked at
+              </ActButton>
+            </div>
+          )}
           {flags.length === 0 ? (
-            <Card>
-              <Empty>Nothing flagged to look at.</Empty>
-            </Card>
+            <Nothing icon={<FlagIcon />} title="Nothing flagged to look at" />
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-              {flags.map((f) => (
-                <div
-                  key={f.id}
-                  className={cx("rounded-xl border bg-canvas p-2", selected.has(f.id) ? "border-ink ring-1 ring-ink" : "border-line")}
-                >
-                  <MediaTile mediaKey={f.key} />
-                  <div className="mt-2 space-y-1 text-xs">
-                    <PersonLink person={f.person} size={20} />
-                    <div className="flex flex-wrap items-center gap-1">
-                      <Badge tone={f.verdict === "rejected" ? "negative" : "warning"}>{f.context}</Badge>
-                      <Time value={f.created_at} />
-                      {(f.userFlags30d ?? 0) > 1 && <Badge>{f.userFlags30d} in 30 d</Badge>}
-                    </div>
-                    <p className="text-mute">{f.labels.slice(0, 3).join(", ")}</p>
-                    {f.reviewed_at ? (
-                      <p className="text-mute">looked at by {f.reviewed_by}</p>
-                    ) : (
-                      <label className="flex items-center gap-1.5 pt-1 text-body">
-                        <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggle(f.id)} />
-                        select
-                      </label>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              <QueueMotion>
+                {flags.map((f) => (
+                  <QueueItem key={f.id} id={f.id}>
+                    <Card className={cn("gap-3 overflow-hidden pt-0 transition-shadow", selected.has(f.id) && "ring-2 ring-primary")}>
+                      <MediaTile mediaKey={f.key} className="rounded-none">
+                        <Badge variant={f.verdict === "rejected" ? "destructive" : "secondary"} className="absolute top-2 left-2 capitalize backdrop-blur">
+                          {f.context}
+                        </Badge>
+                        {!f.reviewed_at && (
+                          <Checkbox
+                            aria-label="Select"
+                            checked={selected.has(f.id)}
+                            onCheckedChange={(on) => toggle(f.id, on === true)}
+                            className="absolute top-2 right-2 bg-background/80 backdrop-blur"
+                          />
+                        )}
+                      </MediaTile>
+                      <CardHeader className="px-3">
+                        <CardTitle className="text-sm">
+                          <PersonLink person={f.person} />
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          {f.labels.slice(0, 3).join(", ")}
+                          <br />
+                          <TimeAgo value={f.created_at} />
+                          {(f.userFlags30d ?? 0) > 1 && <>, {f.userFlags30d} flags in 30 days</>}
+                          {f.reviewed_at && <>, looked at by {f.reviewed_by}</>}
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  </QueueItem>
+                ))}
+              </QueueMotion>
             </div>
           )}
         </div>
-        <Card title="Most flagged, 30 days" className="lg:self-start">
+        <Panel title="Most flagged" description="Last 30 days" className="self-start" contentClassName="px-0">
           {users.length === 0 ? (
-            <Empty>Nobody.</Empty>
+            <Nothing title="Nobody" />
           ) : (
-            <Table head={["Account", "Flags", "Chat"]}>
-              {users.map((u) => (
-                <tr key={u.person.id}>
-                  <td>
-                    <PersonLink person={u.person} size={20} />
-                  </td>
-                  <td>
-                    {u.flags} {u.rejected > 0 && <span className="text-negative-deep">({u.rejected} red)</span>}
-                  </td>
-                  <td>{u.inChats}</td>
-                </tr>
-              ))}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-6">Account</TableHead>
+                  <TableHead className="text-right">Flags</TableHead>
+                  <TableHead className="pr-6 text-right">Chat</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((u) => (
+                  <TableRow key={u.person.id}>
+                    <TableCell className="pl-6">
+                      <PersonLink person={u.person} showHold={false} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {u.flags}
+                      {u.rejected > 0 && <span className="text-destructive"> ({u.rejected})</span>}
+                    </TableCell>
+                    <TableCell className="pr-6 text-right">{u.inChats}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
             </Table>
           )}
-        </Card>
+        </Panel>
       </div>
     </Page>
   );

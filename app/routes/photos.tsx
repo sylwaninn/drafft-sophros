@@ -1,9 +1,14 @@
+import { CheckIcon, XIcon } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { ActButton } from "~/components/app/act";
+import { MediaTile, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
+import { QueueItem, QueueMotion } from "~/components/app/motion";
+import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
 import type { Person } from "~/lib/types";
-import { ActForm, Button } from "~/components/actions";
-import { Badge, Card, Empty, MediaTile, Page, PersonLink, Time, useRoot } from "~/components/ui";
 import type { Route } from "./+types/photos";
 
 interface Pending {
@@ -25,47 +30,49 @@ export default function Photos({ loaderData: { media } }: Route.ComponentProps) 
   const { staff } = useRoot();
   const moderator = can(staff, "moderator");
   return (
-    <Page
-      title="Photo reviews"
-      subtitle="Profile photos and videos the automatic check left for a person: second looks asked for first, then borderline ones."
-    >
+    <Page>
+      <PageHeader
+        title="Photo reviews"
+        description="Profile photos the automatic check left to a person: second looks asked for first, then borderline ones. Approved photos go live at once."
+      />
       {media.length === 0 ? (
-        <Card>
-          <Empty>Nothing to review.</Empty>
-        </Card>
+        <Nothing title="Nothing to review">Photos the check can't decide on land here.</Nothing>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {media.map((m) => (
-            <Card key={m.id} className="overflow-hidden">
-              <MediaTile mediaKey={m.key} kind={m.kind} posterKey={m.posterKey} />
-              <div className="mt-2 space-y-1.5 text-xs">
-                <PersonLink person={m.person} size={20} />
-                <div className="flex flex-wrap items-center gap-1">
-                  {m.reviewRequestedAt ? <Badge tone="cyan">second look asked</Badge> : <Badge tone="warning">borderline</Badge>}
-                  <Time value={m.reviewRequestedAt ?? m.createdAt} />
-                </div>
-                {m.labels && m.labels.length > 0 && <p className="text-mute">{m.labels.join(", ")}</p>}
-                {moderator && (
-                  <div className="flex gap-1.5 pt-1">
-                    <ActForm intent="media" fields={{ media: m.id, approved: "true" }} className="flex-1">
-                      {({ pending }) => (
-                        <Button tone="lime" pending={pending} className="w-full">
-                          Approve
-                        </Button>
-                      )}
-                    </ActForm>
-                    <ActForm intent="media" fields={{ media: m.id, approved: "false" }} className="flex-1">
-                      {({ pending }) => (
-                        <Button pending={pending} className="w-full">
-                          Refuse
-                        </Button>
-                      )}
-                    </ActForm>
-                  </div>
-                )}
-              </div>
-            </Card>
-          ))}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <QueueMotion>
+            {media.map((m) => (
+              <QueueItem key={m.id} id={m.id}>
+                <Card className="gap-3 overflow-hidden pt-0">
+                  <MediaTile mediaKey={m.key} kind={m.kind} posterKey={m.posterKey} className="rounded-none">
+                    <Badge variant="secondary" className="absolute top-2 left-2 backdrop-blur">
+                      {m.reviewRequestedAt ? "Second look" : "Borderline"}
+                    </Badge>
+                  </MediaTile>
+                  <CardHeader className="px-3">
+                    <CardTitle className="text-sm">
+                      <PersonLink person={m.person} showHold={false} />
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      {m.labels?.length ? m.labels.join(", ") : "No label"}, <TimeAgo value={m.reviewRequestedAt ?? m.createdAt} />
+                    </CardDescription>
+                  </CardHeader>
+                  {moderator && (
+                    <CardFooter className="gap-2 px-3">
+                      <ActButton intent="media" fields={{ media: m.id, approved: "false" }} variant="outline" size="sm" className="flex-1">
+                        <XIcon data-icon="inline-start" />
+                        Refuse
+                      </ActButton>
+                      <ActButton intent="media" fields={{ media: m.id, approved: "true" }} size="sm" className="flex-1">
+                        <CheckIcon data-icon="inline-start" />
+                        Approve
+                      </ActButton>
+                    </CardFooter>
+                  )}
+                  {!moderator && <CardContent className="px-3 text-xs text-muted-foreground">Moderators decide.</CardContent>}
+                </Card>
+              </QueueItem>
+            ))}
+          </QueueMotion>
         </div>
       )}
     </Page>

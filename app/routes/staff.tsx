@@ -1,7 +1,19 @@
+import { useState } from "react";
+import { UserPlusIcon } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "~/components/ui/dialog";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "~/components/ui/field";
+import { Input } from "~/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { Spinner } from "~/components/ui/spinner";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { useAct } from "~/components/app/act";
+import { Page, PageHeader, TimeAgo } from "~/components/app/bits";
+import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
-import { ActForm, Button, inputClass } from "~/components/actions";
-import { Badge, Card, Page, Table, Time, useRoot } from "~/components/ui";
 import type { Route } from "./+types/staff";
 
 interface Member {
@@ -18,81 +30,138 @@ export async function loader({ context }: Route.LoaderArgs) {
 }
 
 const roles = [
-  ["support", "Support: accounts, support, reports (read), notes"],
-  ["moderator", "Moderator: + holds, photos, flags, reports, conversations, selfies"],
-  ["admin", "Admin: + lifting bans, staff, the whole audit log"],
+  ["support", "Accounts, support, reports to read, notes"],
+  ["moderator", "Plus holds, photos, flags, reports, conversations, selfies"],
+  ["admin", "Plus lifting bans, the staff and the whole audit log"],
 ] as const;
+
+function RoleSelect({ member }: { member: Member }) {
+  const { fetcher } = useAct();
+  const value = (fetcher.formData?.get("role") as string | undefined) ?? (member.disabled_at ? "disabled" : member.role);
+  return (
+    <Select
+      value={value}
+      onValueChange={(role) => fetcher.submit({ intent: "staff", email: member.email, role: role === "disabled" ? "" : role }, { method: "post", action: "/act" })}
+    >
+      <SelectTrigger size="sm" className="w-36" aria-label={`Role of ${member.email}`}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="support">Support</SelectItem>
+        <SelectItem value="moderator">Moderator</SelectItem>
+        <SelectItem value="admin">Admin</SelectItem>
+        <SelectItem value="disabled">Disabled</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+function AddStaff() {
+  const [open, setOpen] = useState(false);
+  const [role, setRole] = useState("support");
+  const { fetcher, pending } = useAct({ onDone: () => setOpen(false) });
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <UserPlusIcon data-icon="inline-start" />
+          Add someone
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add someone to the staff</DialogTitle>
+          <DialogDescription>They also need to be let in by Cloudflare Access for this environment.</DialogDescription>
+        </DialogHeader>
+        <fetcher.Form method="post" action="/act" className="grid gap-6">
+          <input type="hidden" name="intent" value="staff" />
+          <input type="hidden" name="role" value={role} />
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="staff-email">Email</FieldLabel>
+              <Input id="staff-email" name="email" type="email" required autoFocus placeholder="name@getdrafft.com" />
+              <FieldDescription>The one their Access sign-in uses.</FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel>Role</FieldLabel>
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map(([value]) => (
+                    <SelectItem key={value} value={value} className="capitalize">
+                      {value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldDescription>{roles.find(([v]) => v === role)?.[1]}</FieldDescription>
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={pending}>
+              {pending && <Spinner data-icon="inline-start" />}
+              Add
+            </Button>
+          </DialogFooter>
+        </fetcher.Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function Staff({ loaderData: { members } }: Route.ComponentProps) {
   const { staff, env } = useRoot();
   return (
-    <Page
-      title="Staff"
-      subtitle={`Who can open sophros ${env}. Each environment has its own list; Cloudflare Access must let them in too.`}
-    >
-      <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
-        <Card>
-          <Table head={["Email", "Role", "Added", "Last seen", ""]}>
+    <Page>
+      <PageHeader
+        title="Staff"
+        description={`Who can open sophros on ${env}, and with which role. Each environment has its own list.`}
+        actions={<AddStaff />}
+      />
+      <Card className="py-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-4">Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Added</TableHead>
+              <TableHead className="pr-4">Last seen</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {members.map((m) => (
-              <tr key={m.email} className={m.disabled_at ? "opacity-50" : undefined}>
-                <td className="font-medium">
-                  {m.email} {m.email === staff.email && <Badge>you</Badge>}
-                </td>
-                <td>{m.disabled_at ? <Badge>disabled</Badge> : <Badge tone={m.role === "admin" ? "ink" : m.role === "moderator" ? "lime" : "neutral"}>{m.role}</Badge>}</td>
-                <td className="text-xs text-mute">
-                  <Time value={m.created_at} />
-                  {m.created_by && <> by {m.created_by}</>}
-                </td>
-                <td>
-                  <Time value={m.last_seen_at} />
-                </td>
-                <td className="text-right">
-                  {m.email !== staff.email && (
-                    <ActForm intent="staff" fields={{ email: m.email }} className="flex justify-end gap-1">
-                      {({ pending }) => (
-                        <>
-                          <select name="role" defaultValue={m.disabled_at ? "" : m.role} className={`${inputClass} w-32 py-1 text-xs`} aria-label={`Role of ${m.email}`}>
-                            <option value="support">support</option>
-                            <option value="moderator">moderator</option>
-                            <option value="admin">admin</option>
-                            <option value="">disabled</option>
-                          </select>
-                          <Button pending={pending} className="py-1 text-xs">
-                            Save
-                          </Button>
-                        </>
-                      )}
-                    </ActForm>
-                  )}
-                </td>
-              </tr>
+              <TableRow key={m.email} className={m.disabled_at ? "text-muted-foreground" : undefined}>
+                <TableCell className="pl-4 font-medium">
+                  {m.email} {m.email === staff.email && <Badge variant="secondary">You</Badge>}
+                </TableCell>
+                <TableCell>
+                  {m.email === staff.email ? <Badge className="capitalize">{m.role}</Badge> : <RoleSelect member={m} />}
+                </TableCell>
+                <TableCell>
+                  <TimeAgo value={m.created_at} />
+                  {m.created_by && <span className="text-muted-foreground"> by {m.created_by}</span>}
+                </TableCell>
+                <TableCell className="pr-4">
+                  <TimeAgo value={m.last_seen_at} />
+                </TableCell>
+              </TableRow>
             ))}
-          </Table>
-        </Card>
-        <Card title="Add someone" className="lg:self-start">
-          <ActForm intent="staff" resetOnSuccess className="space-y-2">
-            {({ pending }) => (
-              <>
-                <input name="email" type="email" required placeholder="Their email, as Access knows it" className={inputClass} />
-                <select name="role" defaultValue="support" className={inputClass} aria-label="Role">
-                  {roles.map(([value]) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
-                <Button tone="primary" pending={pending}>
-                  Add
-                </Button>
-              </>
-            )}
-          </ActForm>
-          <ul className="mt-4 space-y-1 text-xs text-mute">
-            {roles.map(([value, label]) => (
-              <li key={value}>{label}</li>
-            ))}
-          </ul>
-        </Card>
+          </TableBody>
+        </Table>
+      </Card>
+      <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+        {roles.map(([value, label]) => (
+          <p key={value}>
+            <span className="font-medium text-foreground capitalize">{value}</span>: {label}.
+          </p>
+        ))}
       </div>
     </Page>
   );

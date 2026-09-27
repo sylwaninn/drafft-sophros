@@ -2,6 +2,8 @@ import { type RouteConfig, index, layout, route } from "@react-router/dev/routes
 
 export default [
   route("act", "routes/act.ts"),
+  route("search", "routes/search.ts"),
+  route("theme", "routes/theme.ts"),
   layout("routes/shell.tsx", [
     layout("routes/pane.tsx", [
     index("routes/overview.tsx"),

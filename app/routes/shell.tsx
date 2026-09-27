@@ -1,86 +1,78 @@
-import { Form, NavLink, Outlet, useNavigation } from "react-router";
-import { can, type Role } from "~/lib/roles";
-import { cx, useRoot } from "~/components/ui";
+import { Fragment } from "react";
+import { Link, Outlet, useLocation, useMatches, useNavigation } from "react-router";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "~/components/ui/breadcrumb";
+import { Separator } from "~/components/ui/separator";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar";
+import { Spinner } from "~/components/ui/spinner";
+import { AppSidebar } from "~/components/app/app-sidebar";
+import { nav } from "~/components/app/nav";
+import { useRoot } from "~/components/app/root-data";
+import { SearchCommand } from "~/components/app/search-command";
 
-const nav: { to: string; label: string; count?: string; role: Role }[][] = [
-  [
-    { to: "/", label: "Overview", role: "support" },
-    { to: "/accounts", label: "Accounts", role: "support" },
-  ],
-  [
-    { to: "/verifications", label: "Verifications", count: "verifications", role: "support" },
-    { to: "/reports", label: "Reports", count: "reports", role: "support" },
-    { to: "/support", label: "Support", count: "support", role: "support" },
-    { to: "/photos", label: "Photo reviews", count: "photos", role: "support" },
-    { to: "/flags", label: "Flagged media", count: "flags", role: "moderator" },
-    { to: "/conversations", label: "Conversations", role: "moderator" },
-  ],
-  [
-    { to: "/audit", label: "Audit log", role: "admin" },
-    { to: "/staff", label: "Staff", role: "admin" },
-  ],
-];
+/** Pages can name themselves in the breadcrumb: `export const handle = { crumb: (data) => "…" }`. */
+export interface Crumb {
+  crumb?: (data: unknown) => string;
+}
 
-const envStyle = {
-  local: "bg-soft-2 text-body",
-  staging: "bg-warning text-ink",
-  production: "bg-negative text-canvas",
-};
+function Crumbs() {
+  const { pathname } = useLocation();
+  const matches = useMatches();
+  const section = nav.find((n) => (n.to === "/" ? pathname === "/" : pathname.startsWith(n.to)));
+  const leaf = [...matches].reverse().find((m) => (m.handle as Crumb | undefined)?.crumb);
+  const leafLabel = leaf ? (leaf.handle as Crumb).crumb!(leaf.loaderData) : null;
+  const trail = [section && { label: section.label, to: section.to }, leafLabel && { label: leafLabel, to: pathname }].filter(Boolean) as {
+    label: string;
+    to: string;
+  }[];
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        {trail.map((c, i) => (
+          <Fragment key={c.to}>
+            {i > 0 && <BreadcrumbSeparator />}
+            <BreadcrumbItem>
+              {i === trail.length - 1 ? (
+                <BreadcrumbPage className="max-w-48 truncate">{c.label}</BreadcrumbPage>
+              ) : (
+                <BreadcrumbLink asChild>
+                  <Link to={c.to} viewTransition>
+                    {c.label}
+                  </Link>
+                </BreadcrumbLink>
+              )}
+            </BreadcrumbItem>
+          </Fragment>
+        ))}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
 
 export default function Shell() {
-  const { staff, env, counts } = useRoot();
+  const { sidebarOpen } = useRoot();
   const navigation = useNavigation();
   return (
-    <div className="flex min-h-screen">
-      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-line bg-canvas">
-        <div className="px-4 pt-4 pb-3">
-          <div className="text-lg font-semibold tracking-tight">sophros</div>
-          <div className={cx("mt-1.5 inline-block rounded-md px-2 py-0.5 text-xs font-semibold", envStyle[env])}>{env}</div>
-        </div>
-        <Form method="get" action="/accounts" className="px-3 pb-3">
-          <input
-            name="q"
-            type="search"
-            placeholder="Find an account"
-            aria-label="Find an account by name, email, phone or id"
-            className="w-full rounded-lg bg-soft px-3 py-1.5 text-sm placeholder:text-mute focus:bg-canvas focus:outline-1 focus:outline-line"
-          />
-        </Form>
-        <nav className="flex-1 space-y-3 overflow-y-auto px-2 text-sm">
-          {nav.map((group, i) => (
-            <ul key={i} className="space-y-0.5">
-              {group
-                .filter((item) => can(staff, item.role))
-                .map((item) => {
-                  const count = item.count ? counts[item.count] : 0;
-                  return (
-                    <li key={item.to}>
-                      <NavLink
-                        to={item.to}
-                        end={item.to === "/"}
-                        className={({ isActive }) =>
-                          cx("flex items-center justify-between rounded-lg px-3 py-1.5", isActive ? "bg-ink text-canvas" : "text-body hover:bg-soft")
-                        }
-                      >
-                        {item.label}
-                        {count > 0 && <span className="rounded-full bg-lime px-1.5 text-xs font-semibold text-ink">{count}</span>}
-                      </NavLink>
-                    </li>
-                  );
-                })}
-            </ul>
-          ))}
-        </nav>
-        <div className="border-t border-line px-4 py-3 text-xs">
-          <div className="truncate font-medium" title={staff.email}>
-            {staff.email}
+    <SidebarProvider defaultOpen={sidebarOpen}>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 rounded-t-xl border-b bg-background/80 px-4 backdrop-blur supports-backdrop-filter:bg-background/70">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+          <Crumbs />
+          <div className="ml-auto flex items-center gap-3">
+            {navigation.state !== "idle" && <Spinner className="text-muted-foreground" />}
+            <SearchCommand />
           </div>
-          <div className="text-mute">{staff.role}</div>
-        </div>
-      </aside>
-      <main className={cx("min-w-0 flex-1 transition-opacity", navigation.state === "loading" && "opacity-60")}>
+        </header>
         <Outlet />
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

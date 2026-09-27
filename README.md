@@ -42,7 +42,7 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
 
 | Page | What for |
 | --- | --- |
-| Overview | queues waiting for the team, sign-ups, activity, holds |
+| Queues | every queue with its size and oldest case, the longest waiting first; accounts on hold |
 | Accounts | search by name, email, phone digits or id; filters (held, flagged, reported, tempo) |
 | Account | profile and photos, email and phone, sign-in methods, sessions (IP, client), devices (model, iOS, app version, locale, time zone, IP, country, opens, last opened), IPs, approximate location, usage, holds and their history, reports, blocks, flagged media, related accounts (same install, IP or marked identity), matches, wallet and purchases, support, notes, staff trail; hold, sign out everywhere, approve or refuse photos |
 | Verifications | selfie next to the profile photos (lift, ask again, ban), accounts in review with their cause, selfies still owed |
@@ -73,7 +73,8 @@ the person).
 Demo data, local database only: `scripts/demo.sh up` adds 14 accounts covering every case (a ban and a
 new account on the same iPhone, a selfie to compare, reports, flagged chat photos, support requests),
 `scripts/demo.sh down` removes them. They go in with triggers off (no email, push, Stream or R2 call) and
-never show in the app's Discover. Their pictures are drawn silhouettes in the local Storage.
+never show in the app's Discover. Their pictures are stock placeholders (i.pravatar.cc portraits, picsum.photos
+scenes) copied to the local Storage, and their conversations are canned (Stream isn't needed locally).
 
 Checks: `pnpm typecheck && pnpm test && pnpm build`.
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { can } from "~/lib/roles";
-import { ago } from "~/components/ui";
+import { ago } from "~/components/app/format";
 
 describe("can", () => {
   it("gives each role the rights of the ones before", () => {
