@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Form, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
 import { CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
@@ -216,6 +216,7 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
 /** A request, the team's replies under it, and the reply box: sent by email from the backend. */
 function Thread({ request: r }: { request: SupportRequest }) {
   const form = useRef<HTMLFormElement>(null);
+  const formId = useId();
   const [close, setClose] = useState(true);
   const { fetcher, pending } = useAct({ onDone: () => form.current?.reset() });
   // A reply is emailed by the backend a moment later: check back until it's sent.
@@ -279,8 +280,8 @@ function Thread({ request: r }: { request: SupportRequest }) {
           </ItemGroup>
         </div>
       </ScrollArea>
-      <SheetFooter className="border-t">
-        <fetcher.Form ref={form} method="post" action="/act" className="grid gap-3">
+      <SheetFooter className="gap-3 border-t">
+        <fetcher.Form ref={form} id={formId} method="post" action="/act" className="grid gap-3">
           <input type="hidden" name="intent" value="support-reply" />
           <input type="hidden" name="id" value={r.id} />
           <input type="hidden" name="close" value={String(close)} />
@@ -307,37 +308,38 @@ function Thread({ request: r }: { request: SupportRequest }) {
               Emailed to {r.email} with the reference, framed in their language. Their answer reaches the support inbox.
             </FieldDescription>
           </Field>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Checkbox id="close" checked={close} onCheckedChange={(v) => setClose(v === true)} />
-              <Label htmlFor="close" className="font-normal">
-                Close the request
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              {r.handled_at && (
-                <ActButton intent="support" fields={{ id: r.id, handled: "false" }} variant="ghost" size="sm">
-                  <RotateCcwIcon data-icon="inline-start" />
-                  Reopen
-                </ActButton>
-              )}
-              {!r.handled_at && (
-                <ActButton intent="support" fields={{ id: r.id, handled: "true" }} variant="ghost" size="sm">
-                  <CheckIcon data-icon="inline-start" />
-                  Close without replying
-                </ActButton>
-              )}
-              <Button type="submit" disabled={pending}>
-                {pending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
-                Send
-                <KbdGroup className="ml-1">
-                  <Kbd>⌘</Kbd>
-                  <Kbd>↵</Kbd>
-                </KbdGroup>
-              </Button>
-            </div>
-          </div>
         </fetcher.Form>
+        {/* Outside the reply form: each of these buttons is a form of its own. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Checkbox id="close" checked={close} onCheckedChange={(v) => setClose(v === true)} />
+            <Label htmlFor="close" className="font-normal">
+              Close the request
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            {r.handled_at && (
+              <ActButton intent="support" fields={{ id: r.id, handled: "false" }} variant="ghost" size="sm">
+                <RotateCcwIcon data-icon="inline-start" />
+                Reopen
+              </ActButton>
+            )}
+            {!r.handled_at && (
+              <ActButton intent="support" fields={{ id: r.id, handled: "true" }} variant="ghost" size="sm">
+                <CheckIcon data-icon="inline-start" />
+                Close without replying
+              </ActButton>
+            )}
+            <Button type="submit" form={formId} disabled={pending}>
+              {pending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
+              Send
+              <KbdGroup className="ml-1">
+                <Kbd>⌘</Kbd>
+                <Kbd>↵</Kbd>
+              </KbdGroup>
+            </Button>
+          </div>
+        </div>
       </SheetFooter>
     </>
   );
