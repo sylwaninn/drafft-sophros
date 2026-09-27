@@ -1,0 +1,206 @@
+// Shapes returned by the admin_* functions (jsonb), as the dashboard reads them.
+
+export type Hold = "review" | "selfie" | "banned";
+
+export interface Person {
+  id: string;
+  name?: string;
+  moderation?: Hold | null;
+  photo?: string | null;
+  deleted?: boolean;
+}
+
+export interface Overview {
+  accounts: number;
+  onboarded: number;
+  signups7d: number;
+  active1d: number;
+  active7d: number;
+  opened1d: number;
+  premium: number;
+  matches7d: number;
+  holds: Partial<Record<Hold, number>>;
+  selfiesToCheck: number;
+  openReports: number;
+  openSupport: number;
+  openDataRequests: number;
+  mediaToReview: number;
+  openFlags: number;
+  signupsByDay: { day: string; count: number }[];
+}
+
+export interface UserRow {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  moderation: Hold | null;
+  paused: boolean;
+  onboarded_at: string | null;
+  created_at: string;
+  last_active_at: string;
+  last_opened_at: string | null;
+  photo: string | null;
+  premium: boolean;
+  flags: number;
+  reports: number;
+}
+
+export interface Media {
+  id: string;
+  kind: "photo" | "video";
+  key: string;
+  posterKey: string | null;
+  position: number;
+  status: "pending" | "approved" | "rejected";
+  width: number;
+  height: number;
+  createdAt: string;
+  reviewRequestedAt: string | null;
+}
+
+export interface Flag {
+  id: number;
+  context: "chat" | "profile";
+  key: string;
+  verdict: "rejected" | "review";
+  labels: string[];
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  person?: Person | null;
+  userFlags30d?: number;
+}
+
+export interface Report {
+  id: string;
+  reason: string;
+  details: string;
+  createdAt: string;
+  handledAt: string | null;
+  handledBy: string | null;
+  resolution: string | null;
+  reporter: Person | null;
+  reported: Person | null;
+  reportedCount30d?: number;
+  match?: string | null;
+}
+
+export interface SupportRequest {
+  id: number;
+  reference: string;
+  email: string;
+  language: string;
+  topic: string;
+  message: string;
+  context: Record<string, unknown>;
+  created_at: string;
+  handled_at: string | null;
+  handled_by: string | null;
+  person: Person | null;
+}
+
+export interface DataRequest {
+  id: number;
+  kind: string;
+  created_at: string;
+  fulfilled_at: string | null;
+  fulfilled_by: string | null;
+  person: Person | null;
+  email: string | null;
+}
+
+export interface MatchRow {
+  id: string;
+  createdAt: string;
+  endedAt: string | null;
+  endedBy: string | null;
+  a: Person;
+  b: Person;
+  sessions?: number;
+}
+
+export interface AuditEntry {
+  id: number;
+  actor: string;
+  action: string;
+  user_id: string | null;
+  target: string | null;
+  reason: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+  person: Person | null;
+}
+
+export interface Related {
+  person: Person;
+  via: "install" | "ip" | "identity";
+  detail: string | null;
+  at: string | null;
+}
+
+export interface Device {
+  install_id: string;
+  model: string;
+  os_version: string;
+  app_version: string;
+  app_build: string;
+  locale: string;
+  timezone: string;
+  ip: string | null;
+  country: string | null;
+  opens: number;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface UserDetail {
+  profile: Record<string, unknown> & {
+    id: string;
+    name: string;
+    birthdate: string | null;
+    gender: string | null;
+    moderation: Hold | null;
+    paused: boolean;
+    created_at: string;
+    last_active_at: string;
+    onboarded_at: string | null;
+    voice_intro_key: string | null;
+    language?: string;
+  };
+  auth: {
+    email: string | null;
+    phone: string | null;
+    emailConfirmedAt: string | null;
+    phoneConfirmedAt: string | null;
+    createdAt: string;
+    lastSignInAt: string | null;
+    signupLanguage: string | null;
+    providers: { provider: string; email: string | null; createdAt: string; lastSignInAt: string | null }[];
+  };
+  sessions: { id: string; createdAt: string; refreshedAt: string | null; userAgent: string | null; ip: string | null }[];
+  media: Media[];
+  sports: { sport: string; perWeek: number }[];
+  prompts: { question: string; answer: string }[];
+  wallet: Record<string, unknown> | null;
+  purchases: { id: string; type: string; product_id: string | null; environment: string | null; event_at: string; effect: string }[];
+  location: { lat: number; lng: number; updatedAt: string } | null;
+  devices: Device[];
+  ips: { ip: string; country: string | null; first_seen_at: string; last_seen_at: string }[];
+  pushTokens: { environment: string; updatedAt: string; token: string }[];
+  deviceCheck: { environment: string; updatedAt: string; flaggedAt: string | null } | null;
+  moderationLog: { state: Hold | null; note: string | null; actor: string | null; createdAt: string }[];
+  marks: { kind: string; state: Hold; createdAt: string }[];
+  selfies: { id: number; createdAt: string }[];
+  stats: Record<string, number>;
+  matches: { id: string; createdAt: string; endedAt: string | null; endedBy: string | null; other: Person }[];
+  blocksGiven: { person: Person; createdAt: string }[];
+  blocksReceived: { person: Person; createdAt: string }[];
+  reportsReceived: (Report & { reporter: Person | null })[];
+  reportsMade: { id: string; reason: string; details: string; reported: Person; createdAt: string }[];
+  flags: Flag[];
+  support: { id: number; reference: string; topic: string; createdAt: string; handledAt: string | null }[];
+  dataRequests: { id: number; kind: string; created_at: string; fulfilled_at: string | null }[];
+  notes: { id: number; author: string; body: string; created_at: string }[];
+  related: Related[];
+}

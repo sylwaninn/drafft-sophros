@@ -1,0 +1,8 @@
+# Local secrets for `pnpm dev` (copied to .dev.vars by scripts/local-env.sh, which fills them in).
+# The local Supabase's service role key: `supabase status` in drafft-backend.
+SUPABASE_SECRET_KEY=
+# Stream staging app (the local backend chats through staging services).
+STREAM_API_KEY=
+STREAM_API_SECRET=
+# AUTH_MODE=dev only: who you are locally. Must be in private.staff (supabase/seed.sql adds dev@drafft.local).
+DEV_STAFF_EMAIL=dev@drafft.local

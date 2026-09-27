@@ -1,0 +1,59 @@
+/**
+ * One Worker per environment, each behind its own Cloudflare Access application.
+ *
+ *   pnpm dev                     local: the local Supabase of drafft-backend (.dev.vars)
+ *   pnpm run deploy:staging      sophros-staging    → staging project
+ *   pnpm run deploy:production   sophros-production → production project
+ *
+ * Secrets, per environment, never in this file (README, "Deploying"):
+ *   wrangler secret put SUPABASE_SECRET_KEY --env <env>
+ *   wrangler secret put STREAM_API_KEY --env <env>
+ *   wrangler secret put STREAM_API_SECRET --env <env>
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sophros-local",
+	"compatibility_date": "2026-09-25",
+	"main": "./workers/app.ts",
+	"observability": { "enabled": true },
+	"upload_source_maps": true,
+	// Never on a *.workers.dev address: only through the custom domain that Access protects.
+	"workers_dev": false,
+	"preview_urls": false,
+	"vars": {
+		"DRAFFT_ENV": "local",
+		"AUTH_MODE": "dev",
+		"SUPABASE_URL": "http://127.0.0.1:55421",
+		"MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
+		"ACCESS_TEAM_DOMAIN": "",
+		"ACCESS_AUD": ""
+	},
+	"env": {
+		"staging": {
+			"name": "sophros-staging",
+			"routes": [{ "pattern": "sophros-staging.getdrafft.com", "custom_domain": true }],
+			"vars": {
+				"DRAFFT_ENV": "staging",
+				"AUTH_MODE": "access",
+				"SUPABASE_URL": "https://rjlghcuspdtrmbimyioe.supabase.co",
+				"MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
+				// Zero Trust > Settings > Custom Pages: https://<team>.cloudflareaccess.com
+				"ACCESS_TEAM_DOMAIN": "",
+				// Zero Trust > Access > Applications > sophros staging > Application Audience (AUD) Tag
+				"ACCESS_AUD": ""
+			}
+		},
+		"production": {
+			"name": "sophros-production",
+			"routes": [{ "pattern": "sophros.getdrafft.com", "custom_domain": true }],
+			"vars": {
+				"DRAFFT_ENV": "production",
+				"AUTH_MODE": "access",
+				"SUPABASE_URL": "https://wrcpgnqwjmnirjfxpcux.supabase.co",
+				"MEDIA_PUBLIC_URL": "https://pub-f4b77604ea6f42188c3ba8da914a6a16.r2.dev",
+				"ACCESS_TEAM_DOMAIN": "",
+				"ACCESS_AUD": ""
+			}
+		}
+	}
+}

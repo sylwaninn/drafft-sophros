@@ -1,0 +1,41 @@
+@import "tailwindcss" source(".");
+
+/* drafft's palette (drafft/DESIGN.md), for a calm, dense working tool. */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-ink: #0e0f0c;
+  --color-body: #454745;
+  --color-mute: #868685;
+  --color-line: #dfe3dc;
+  --color-canvas: #ffffff;
+  --color-soft: #f3f5f1;
+  --color-soft-2: #e8ebe6;
+
+  --color-lime: #9fe870;
+  --color-lime-pale: #e2f6d5;
+  --color-lime-deep: #163300;
+
+  --color-positive: #2ead4b;
+  --color-positive-deep: #054d28;
+  --color-warning: #ffd11a;
+  --color-warning-pale: #fff4c7;
+  --color-warning-deep: #7a4600;
+  --color-negative: #d03238;
+  --color-negative-pale: #fbe3e4;
+  --color-negative-deep: #a72027;
+  --color-cyan: #38c8ff;
+  --color-cyan-pale: #dcf4ff;
+  --color-cyan-deep: #00587a;
+}
+
+html,
+body {
+  @apply bg-soft text-ink antialiased;
+  font-feature-settings: "tnum" 1;
+}
+
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-ink;
+}
