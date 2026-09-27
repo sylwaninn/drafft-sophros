@@ -104,6 +104,7 @@ create temp table demo_media as
     case
       when n = 9 and pos = 2 then 'pending'
       when n = 10 and pos = 2 then 'pending'
+      when n = 8 and pos = 2 then 'rejected'
       else 'approved'
     end::public.media_status as status,
     case when n = 9 and pos = 2 then now() - interval '2 hours' end as review_requested_at,
@@ -166,7 +167,8 @@ insert into public.media_flags (user_id, context, key, verdict, labels, created_
     (2, 'chat', 'u/de000000-0000-4000-8000-000000000002/chat/demo/c1.jpg', 'rejected', '{Graphic Violence}', 200, false),
     (7, 'chat', 'u/de000000-0000-4000-8000-000000000007/chat/demo/c1.jpg', 'review', '{Swimwear or Underwear}', 5, false),
     (10, 'profile', 'u/de000000-0000-4000-8000-000000000010/demo/p2.jpg', 'review', '{Suggestive,Partially Exposed}', 3, false),
-    (9, 'profile', 'u/de000000-0000-4000-8000-000000000009/demo/p2.jpg', 'rejected', '{Alcohol,Drinking}', 26, false)
+    (9, 'profile', 'u/de000000-0000-4000-8000-000000000009/demo/p2.jpg', 'rejected', '{Alcohol,Drinking}', 26, false),
+    (8, 'profile', 'u/de000000-0000-4000-8000-000000000008/demo/p2.jpg', 'rejected', '{Explicit Nudity,Graphic Male Nudity}', 9, false)
   ) v(n, ctx, k, verdict, labels, hrs, done);
 
 -- MARK: Verifications

@@ -34,7 +34,7 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
   | `admin` | lifting a ban, staff, the whole audit log |
 
 - **Sensitive reads are logged too:** opening an account (`user.view`), a selfie (`selfie.view`), a
-  conversation (`conversation.view`, a reason is required and logged on both accounts). Each account page
+  conversation (`conversation.view`, on both accounts, with where it was opened from). Each account page
   shows its staff trail.
 - **Headers:** a nonce-based Content-Security-Policy, no framing, no referrer, `noindex`, `no-store`.
 
@@ -48,8 +48,8 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
 | Verifications | selfie next to the profile photos (lift, ask again, ban), accounts in review with their cause, selfies still owed |
 | Reports | open reports with both people, the count of reporters, their conversation; close with a resolution and an optional hold |
 | Support | help-form messages with their thread; replies are written here and emailed by the backend in the person's language; data exports to send |
-| Photo reviews | profile media the automatic check left pending: second looks first |
-| Flagged media | chat and profile photos flagged silently; mark looked at in bulk; most flagged accounts |
+| Profile photos | one by one: pending photos (approve, refuse) and ones refused automatically (keep, approve anyway); refuse and hold or ban |
+| Shared media | one by one: chat photos the silent check flagged, already delivered; act on the sender (fine, hold, selfie, ban); history and most flagged |
 | Conversations | every match, filtered by person, name or email, status, a report between them, flagged chat photos, sessions; a conversation opens with a reason; delete a message |
 | Audit log, Staff | admins |
 

@@ -75,7 +75,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         await rpc(staff, "admin_set_staff", { p_email: text("email"), p_role: text("role") || null });
         return result({ ok: true, message: "Staff updated." });
       case "batch":
-        return result(await applyBatch(staff, text("ops")));
+        return result(await applyBatch(staff, text("ops"), text("message")));
       case "delete-message": {
         // Logged first: if Stream fails, the attempt is still on record.
         await rpc(staff, "admin_log", {
@@ -98,10 +98,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 /**
- * A batch of review decisions, applied in order once the reviewer confirms them (photo and flag queues).
- * Each op is checked here; a failed one doesn't stop the others, and the answer says how many failed.
+ * One review decision, made of several changes applied in order (refuse a photo, hold its account,
+ * close its flags). Each is checked here; a failed one doesn't stop the others, and the answer says so.
  */
-async function applyBatch(staff: Staff, raw: string): Promise<ActResult> {
+async function applyBatch(staff: Staff, raw: string, message: string): Promise<ActResult> {
   let ops: BatchOp[];
   try {
     ops = JSON.parse(raw);
@@ -126,8 +126,8 @@ async function applyBatch(staff: Staff, raw: string): Promise<ActResult> {
     }
   }
   const done = ops.length - failures.length;
-  if (failures.length) return { ok: false, error: `${done} applied, ${failures.length} failed: ${failures[0]}` };
-  return { ok: true, message: `${done} decision${done === 1 ? "" : "s"} applied.` };
+  if (failures.length) return { ok: false, error: done ? `Partly done, ${failures.length} change failed: ${failures[0]}` : failures[0] };
+  return { ok: true, message: message || `${done} change${done === 1 ? "" : "s"} applied.` };
 }
 
 export type BatchOp =

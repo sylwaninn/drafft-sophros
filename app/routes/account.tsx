@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   CheckIcon,
@@ -32,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Textarea } from "~/components/ui/textarea";
 import { ActButton, HoldControls, ReasonDialog, useAct } from "~/components/app/act";
 import { Facts, HoldBadge, Id, MediaTile, Nothing, OverlayBadge, Page, Panel, PersonAvatar, PersonLink, TimeAgo } from "~/components/app/bits";
+import { ConversationDrawer } from "~/components/app/conversation-drawer";
 import { age } from "~/components/app/format";
 import { useMediaUrl, useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
@@ -652,9 +653,11 @@ function People({ items, empty }: { items: UserDetail["blocksGiven"]; empty: str
 }
 
 function MatchesTab({ u, moderator }: { u: UserDetail; moderator: boolean }) {
+  const [open, setOpen] = useState<string | null>(null);
   if (u.matches.length === 0) return <Nothing icon={<MessagesSquareIcon />} title="No match yet" />;
   return (
     <Card className="py-0">
+      <ConversationDrawer matchId={open} from={`account ${u.profile.name || u.profile.id}`} onClose={() => setOpen(null)} />
       <Table>
         <TableHeader>
           <TableRow>
@@ -676,11 +679,9 @@ function MatchesTab({ u, moderator }: { u: UserDetail; moderator: boolean }) {
               <TableCell>{m.endedAt ? <Badge variant="outline">Ended</Badge> : <Badge variant="secondary">Active</Badge>}</TableCell>
               <TableCell className="pr-4 text-right">
                 {moderator && (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to={`/conversations/${m.id}`} viewTransition>
-                      <MessagesSquareIcon data-icon="inline-start" />
-                      Conversation
-                    </Link>
+                  <Button variant="ghost" size="sm" onClick={() => setOpen(m.id)}>
+                    <MessagesSquareIcon data-icon="inline-start" />
+                    Read
                   </Button>
                 )}
               </TableCell>

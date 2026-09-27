@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { HoldBadge, Nothing, Page, PageHeader, PersonAvatar, PersonLink, TimeAgo } from "~/components/app/bits";
+import { ConversationDrawer } from "~/components/app/conversation-drawer";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import type { MatchRow, Person, UserRow } from "~/lib/types";
@@ -116,7 +117,7 @@ export default function Conversations({ loaderData: { rows, more, page, person }
   const navigate = useNavigate();
   const set = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
-    next.delete("page");
+    if (!("open" in changes)) next.delete("page");
     for (const [k, v] of Object.entries(changes)) {
       if (v) next.set(k, v);
       else next.delete(k);
@@ -136,7 +137,7 @@ export default function Conversations({ loaderData: { rows, more, page, person }
     <Page>
       <PageHeader
         title="Conversations"
-        description="Every match, newest first. Opening a conversation asks why and writes it to both accounts' trail."
+        description="Every match, newest first. Click one to read it; each reading is written to both accounts' trail."
       />
       <div className="flex flex-wrap items-center gap-2">
         <PersonFilter person={person} onPick={(id) => set({ user: id })} />
@@ -186,7 +187,7 @@ export default function Conversations({ loaderData: { rows, more, page, person }
         </ToggleGroup>
         {filtered && (
           <Button variant="ghost" size="sm" asChild>
-            <Link to="?" replace>
+            <Link to="?" replace preventScrollReset>
               Clear filters
             </Link>
           </Button>
@@ -212,11 +213,11 @@ export default function Conversations({ loaderData: { rows, more, page, person }
             </TableHeader>
             <TableBody>
               {rows.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell className="pl-4">
+                <TableRow key={m.id} className="cursor-pointer" data-state={params.get("open") === m.id ? "selected" : undefined} onClick={() => set({ open: m.id })}>
+                  <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
                     <PersonLink person={m.a} />
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <PersonLink person={m.b} />
                   </TableCell>
                   <TableCell>
@@ -231,11 +232,9 @@ export default function Conversations({ loaderData: { rows, more, page, person }
                   </TableCell>
                   <TableCell>{m.sessions || <span className="text-muted-foreground">None</span>}</TableCell>
                   <TableCell className="pr-4 text-right">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link to={`/conversations/${m.id}${m.reported ? "?suggest=report" : ""}`} viewTransition>
-                        Open
-                        <ArrowRightIcon data-icon="inline-end" />
-                      </Link>
+                    <Button variant="ghost" size="sm" onClick={() => set({ open: m.id })}>
+                      Read
+                      <ArrowRightIcon data-icon="inline-end" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -244,6 +243,7 @@ export default function Conversations({ loaderData: { rows, more, page, person }
           </Table>
         </Card>
       )}
+      <ConversationDrawer matchId={params.get("open")} from="conversations list" onClose={() => set({ open: null })} />
       {(page > 0 || more) && (
         <Pagination>
           <PaginationContent>

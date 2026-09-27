@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { MessagesSquareIcon, ShieldAlertIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ReasonDialog } from "~/components/app/act";
+import { ConversationDrawer } from "~/components/app/conversation-drawer";
 import { Facts, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
 import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
@@ -107,8 +108,11 @@ export default function Reports({ loaderData: { reports } }: Route.ComponentProp
 function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: () => void }) {
   const { staff } = useRoot();
   const [hold, setHold] = useState("none");
+  const [reading, setReading] = useState<string | null>(null);
   const moderator = can(staff, "moderator");
   return (
+    <>
+    <ConversationDrawer matchId={reading} from={r ? `report ${r.id.slice(0, 8)}` : "report"} onClose={() => setReading(null)} />
     <Sheet open={!!r} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="sm:max-w-lg">
         {r && (
@@ -132,11 +136,9 @@ function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: (
               />
               {r.details && <blockquote className="border-l-2 pl-4 text-sm whitespace-pre-wrap italic">{r.details}</blockquote>}
               {r.match && moderator && (
-                <Button variant="outline" asChild>
-                  <Link to={`/conversations/${r.match}?suggest=${encodeURIComponent(`report ${r.id.slice(0, 8)}`)}`} viewTransition>
-                    <MessagesSquareIcon data-icon="inline-start" />
-                    Read their conversation
-                  </Link>
+                <Button variant="outline" onClick={() => setReading(r.match ?? null)}>
+                  <MessagesSquareIcon data-icon="inline-start" />
+                  Read their conversation
                 </Button>
               )}
               {r.handledAt && (
@@ -183,5 +185,6 @@ function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: (
         )}
       </SheetContent>
     </Sheet>
+    </>
   );
 }
