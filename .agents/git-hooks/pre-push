@@ -1,0 +1,12 @@
+#!/bin/sh
+# Refuses pushes to main and staging (.agents/rules/commits.md): both deploy, so they only change through
+# pull requests. Work on a branch and open a pull request into staging.
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main | refs/heads/staging)
+      echo "pre-push: pushing to ${remote_ref#refs/heads/} is forbidden. Push a branch and open a pull request into staging." >&2
+      exit 1
+      ;;
+  esac
+done
+exit 0

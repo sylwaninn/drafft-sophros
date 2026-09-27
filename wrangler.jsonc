@@ -11,49 +11,54 @@
  *   wrangler secret put STREAM_API_SECRET --env <env>
  */
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "sophros-local",
-	"compatibility_date": "2026-09-25",
-	"main": "./workers/app.ts",
-	"observability": { "enabled": true },
-	"upload_source_maps": true,
-	// Never on a *.workers.dev address: only through the custom domain that Access protects.
-	"workers_dev": false,
-	"preview_urls": false,
-	"vars": {
-		"DRAFFT_ENV": "local",
-		"AUTH_MODE": "dev",
-		"SUPABASE_URL": "http://127.0.0.1:55421",
-		"MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
-		"ACCESS_TEAM_DOMAIN": "",
-		"ACCESS_AUD": ""
-	},
-	"env": {
-		"staging": {
-			"name": "sophros-staging",
-			"routes": [{ "pattern": "sophros-staging.getdrafft.com", "custom_domain": true }],
-			"vars": {
-				"DRAFFT_ENV": "staging",
-				"AUTH_MODE": "access",
-				"SUPABASE_URL": "https://rjlghcuspdtrmbimyioe.supabase.co",
-				"MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
-				// Zero Trust > Settings > Custom Pages: https://<team>.cloudflareaccess.com
-				"ACCESS_TEAM_DOMAIN": "",
-				// Zero Trust > Access > Applications > sophros staging > Application Audience (AUD) Tag
-				"ACCESS_AUD": ""
-			}
-		},
-		"production": {
-			"name": "sophros-production",
-			"routes": [{ "pattern": "sophros.getdrafft.com", "custom_domain": true }],
-			"vars": {
-				"DRAFFT_ENV": "production",
-				"AUTH_MODE": "access",
-				"SUPABASE_URL": "https://wrcpgnqwjmnirjfxpcux.supabase.co",
-				"MEDIA_PUBLIC_URL": "https://pub-f4b77604ea6f42188c3ba8da914a6a16.r2.dev",
-				"ACCESS_TEAM_DOMAIN": "",
-				"ACCESS_AUD": ""
-			}
-		}
-	}
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sophros-local",
+  "compatibility_date": "2026-09-25",
+  "main": "./workers/app.ts",
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+  // Never on a *.workers.dev address: only through the custom domain that Access protects.
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "DRAFFT_ENV": "local",
+    "AUTH_MODE": "dev",
+    "SUPABASE_URL": "http://127.0.0.1:55421",
+    "MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
+    // Demo pictures (scripts/demo.sh), in the local Storage. Ignored outside local.
+    "DEMO_MEDIA_URL": "http://127.0.0.1:55421/storage/v1/object/public/sophros-demo",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+  },
+  "env": {
+    "staging": {
+      "name": "sophros-staging",
+      "routes": [{ "pattern": "sophros-staging.getdrafft.com", "custom_domain": true }],
+      "vars": {
+        "DRAFFT_ENV": "staging",
+        "AUTH_MODE": "access",
+        "SUPABASE_URL": "https://rjlghcuspdtrmbimyioe.supabase.co",
+        "MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
+        // Zero Trust team domain (Settings > Team name and domain)
+        "ACCESS_TEAM_DOMAIN": "https://drafft-sophros.cloudflareaccess.com",
+        // Access application "sophros staging" > Application Audience (AUD) Tag
+        "ACCESS_AUD": "e64e4a91d758037a35c70d74cb716fb69c39498f605605c98d754388e5bf30f6",
+        "DEMO_MEDIA_URL": "",
+      },
+    },
+    "production": {
+      "name": "sophros-production",
+      "routes": [{ "pattern": "sophros.getdrafft.com", "custom_domain": true }],
+      "vars": {
+        "DRAFFT_ENV": "production",
+        "AUTH_MODE": "access",
+        "SUPABASE_URL": "https://wrcpgnqwjmnirjfxpcux.supabase.co",
+        "MEDIA_PUBLIC_URL": "https://pub-f4b77604ea6f42188c3ba8da914a6a16.r2.dev",
+        "ACCESS_TEAM_DOMAIN": "https://drafft-sophros.cloudflareaccess.com",
+        // Access application "sophros" (production) > Application Audience (AUD) Tag
+        "ACCESS_AUD": "5b71180cae071abc0d89edfae898f0054643e4821ab1e67102400e43773efc3c",
+        "DEMO_MEDIA_URL": "",
+      },
+    },
+  },
 }

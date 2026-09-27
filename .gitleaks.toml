@@ -1,0 +1,10 @@
+# gitleaks: the default rules, plus what is public by design.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public by design"
+# The Access Application Audience tag: Cloudflare shows it in every login redirect (the `kid` parameter);
+# the Worker only compares it with the audience of the signed token.
+regexTarget = "line"
+regexes = ['''"ACCESS_AUD": "[0-9a-f]{64}"''']

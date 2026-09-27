@@ -98,6 +98,7 @@ export interface SupportRequest {
   handled_at: string | null;
   handled_by: string | null;
   person: Person | null;
+  replies: { id: number; author: string; body: string; createdAt: string; sentAt: string | null; error: string | null }[];
 }
 
 export interface DataRequest {
@@ -118,6 +119,8 @@ export interface MatchRow {
   a: Person;
   b: Person;
   sessions?: number;
+  reported?: boolean;
+  chatFlags?: number;
 }
 
 export interface AuditEntry {

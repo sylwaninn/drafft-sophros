@@ -1,9 +1,23 @@
-import { data, isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration, type ShouldRevalidateFunctionArgs } from "react-router";
+import {
+  data,
+  isRouteErrorResponse,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useRouteLoaderData,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 import { staffContext } from "~/lib/context";
 import { AuthError, identify } from "~/lib/.server/auth";
 import { getConfig } from "~/lib/.server/config";
 import { rpc } from "~/lib/.server/db";
-import type { Overview } from "~/lib/types";
+import { ShieldIcon } from "lucide-react";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "~/components/ui/empty";
+import { Toaster } from "~/components/ui/sonner";
+import { TooltipProvider } from "~/components/ui/tooltip";
+import type { RootData } from "~/components/app/root-data";
 import type { Route } from "./+types/root";
 import "./app.css";
 
@@ -25,22 +39,23 @@ export const middleware: Route.MiddlewareFunction[] = [
   },
 ];
 
-export async function loader({ context }: Route.LoaderArgs) {
+function cookie(request: Request, name: string) {
+  return request.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`))?.[1];
+}
+
+export async function loader({ request, context }: Route.LoaderArgs): Promise<RootData> {
   const staff = context.get(staffContext);
   const config = getConfig();
-  const o = await rpc<Overview>(staff, "admin_overview");
+  const overview = await rpc<Pick<RootData, "queues" | "holds">>(staff, "admin_overview");
   return {
     staff,
     env: config.env,
     mediaUrl: config.mediaUrl,
-    counts: {
-      verifications: o.holds.review ?? 0,
-      selfies: o.selfiesToCheck,
-      photos: o.mediaToReview,
-      flags: o.openFlags,
-      reports: o.openReports,
-      support: o.openSupport + o.openDataRequests,
-    },
+    demoMediaUrl: config.demoMediaUrl,
+    theme: cookie(request, "theme") === "light" ? "light" : "dark",
+    sidebarOpen: cookie(request, "sidebar_state") !== "false",
+    holds: overview.holds,
+    queues: overview.queues,
   };
 }
 
@@ -55,8 +70,10 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const root = useRouteLoaderData("root") as RootData | undefined;
+  const theme = root?.theme ?? "dark";
   return (
-    <html lang="en">
+    <html lang="en" className={theme === "dark" ? "dark" : undefined} style={{ colorScheme: theme }}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -66,7 +83,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        {children}
+        <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
+        <Toaster theme={theme} position="bottom-right" richColors={false} />
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -86,16 +104,22 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     if (error.status === 401) title = "Sign in again";
     else if (error.status === 403) title = "No access";
     else if (error.status === 404) title = "Not found";
-    details = typeof body === "string" ? body : body?.message ?? error.statusText;
-    if (typeof body === "object" && body?.email) details += ` (signed in as ${body.email})`;
+    details = typeof body === "string" ? body : (body?.message ?? error.statusText);
+    if (typeof body === "object" && body?.email) details += ` Signed in as ${body.email}.`;
   } else if (import.meta.env.DEV && error instanceof Error) {
     details = error.message;
   }
   return (
-    <main className="mx-auto max-w-lg px-6 py-24">
-      <p className="text-sm font-semibold">sophros</p>
-      <h1 className="mt-6 text-2xl font-semibold tracking-tight">{title}</h1>
-      <p className="mt-2 text-body">{details}</p>
+    <main className="flex min-h-svh items-center justify-center p-6">
+      <Empty className="max-w-md border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <ShieldIcon />
+          </EmptyMedia>
+          <EmptyTitle>{title}</EmptyTitle>
+          <EmptyDescription>{details}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     </main>
   );
 }

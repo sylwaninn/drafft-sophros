@@ -1,9 +1,15 @@
-import { Form, Link, useSearchParams } from "react-router";
+import { Form, Link, useNavigate, useSearchParams } from "react-router";
+import { SearchIcon, UsersIcon } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
+import { Card } from "~/components/ui/card";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "~/components/ui/input-group";
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "~/components/ui/pagination";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import { HoldBadge, Nothing, Page, PageHeader, PersonAvatar, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import type { UserRow } from "~/lib/types";
-import { inputClass } from "~/components/actions";
-import { Avatar, Badge, Card, Empty, HoldBadge, Page, Table, Tabs, Time } from "~/components/ui";
 import type { Route } from "./+types/accounts";
 
 const pageSize = 50;
@@ -15,7 +21,7 @@ const filters = [
   ["banned", "Banned"],
   ["flagged", "Flagged"],
   ["reported", "Reported"],
-  ["premium", "drafft tempo"],
+  ["premium", "tempo"],
   ["active", "Recently active"],
 ] as const;
 
@@ -33,6 +39,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export default function Accounts({ loaderData: { rows, more, page } }: Route.ComponentProps) {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const q = params.get("q") ?? "";
   const filter = params.get("filter") ?? "all";
   const link = (changes: Record<string, string | number | null>) => {
@@ -41,63 +48,122 @@ export default function Accounts({ loaderData: { rows, more, page } }: Route.Com
       if (v === null || v === "" || v === 0) next.delete(k);
       else next.set(k, String(v));
     }
-    const s = next.toString();
-    return s ? `?${s}` : "?";
+    return `?${next}`;
   };
 
   return (
-    <Page title="Accounts" subtitle="Search by name, email, phone digits or account id.">
-      <Form method="get" className="mb-4 flex gap-2">
-        {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
-        <input name="q" defaultValue={q} type="search" placeholder="Name, email, phone or id" className={`${inputClass} max-w-md`} autoFocus={!q} />
-      </Form>
-      <Tabs items={filters.map(([value, label]) => ({ label, to: link({ filter: value === "all" ? null : value, page: null }), active: filter === value }))} />
-      <Card>
-        {rows.length === 0 ? (
-          <Empty>No account matches.</Empty>
-        ) : (
-          <Table head={["Account", "Contact", "Status", "Signed up", "Last active", "Last opened", "30 days"]}>
-            {rows.map((u) => (
-              <tr key={u.id} className="hover:bg-soft/60">
-                <td>
-                  <Link to={`/accounts/${u.id}`} className="flex items-center gap-2 font-medium hover:underline">
-                    <Avatar photo={u.photo} name={u.name} />
-                    {u.name || <span className="text-mute">no name yet</span>}
-                  </Link>
-                </td>
-                <td className="text-body">
-                  <div className="max-w-56 truncate">{u.email}</div>
-                  {u.phone && <div className="text-xs text-mute">+{u.phone}</div>}
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1">
-                    <HoldBadge hold={u.moderation} />
-                    {u.paused && !u.moderation && <Badge>Paused</Badge>}
-                    {!u.onboarded_at && <Badge>Onboarding</Badge>}
-                    {u.premium && <Badge tone="lime">tempo</Badge>}
-                  </div>
-                </td>
-                <td>
-                  <Time value={u.created_at} />
-                </td>
-                <td>
-                  <Time value={u.last_active_at} />
-                </td>
-                <td>
-                  <Time value={u.last_opened_at} />
-                </td>
-                <td className="whitespace-nowrap text-xs">
-                  {u.flags > 0 && <Badge tone="warning">{u.flags} flagged</Badge>} {u.reports > 0 && <Badge tone="negative">{u.reports} reports</Badge>}
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      </Card>
-      <div className="mt-3 flex justify-between text-sm">
-        {page > 0 ? <Link to={link({ page: page - 1 })}>← Newer</Link> : <span />}
-        {more && <Link to={link({ page: page + 1 })}>Older →</Link>}
+    <Page>
+      <PageHeader title="Accounts" description="Search by name, email, phone digits or account id." />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Form method="get" className="w-full sm:w-80">
+          {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
+          <InputGroup>
+            <InputGroupAddon>
+              <SearchIcon />
+            </InputGroupAddon>
+            <InputGroupInput name="q" type="search" defaultValue={q} placeholder="Name, email, phone or id" />
+          </InputGroup>
+        </Form>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={filter}
+          onValueChange={(v) => v && navigate(link({ filter: v === "all" ? null : v, page: null }), { replace: true })}
+          className="flex-wrap"
+        >
+          {filters.map(([value, label]) => (
+            <ToggleGroupItem key={value} value={value}>
+              {label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </div>
+      {rows.length === 0 ? (
+        <Nothing icon={<UsersIcon />} title="No account matches">
+          Try part of the email, the phone's last digits, or the account id.
+        </Nothing>
+      ) : (
+        <Card className="py-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-4">Account</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Signed up</TableHead>
+                <TableHead>Last active</TableHead>
+                <TableHead>Last opened</TableHead>
+                <TableHead className="pr-4 text-right">30 days</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((u) => (
+                <TableRow key={u.id} className="group/row">
+                  <TableCell className="pl-4">
+                    <Link
+                      to={`/accounts/${u.id}`}
+                      viewTransition
+                      prefetch="intent"
+                      className="flex items-center gap-2 font-medium group-hover/row:underline"
+                    >
+                      <PersonAvatar person={u} className="size-7" />
+                      {u.name || <span className="text-muted-foreground">No name yet</span>}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <div className="max-w-56 truncate">{u.email}</div>
+                    {u.phone && <div className="text-xs text-muted-foreground">+{u.phone}</div>}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      <HoldBadge hold={u.moderation} />
+                      {u.paused && !u.moderation && <Badge variant="secondary">Paused</Badge>}
+                      {!u.onboarded_at && <Badge variant="outline">Onboarding</Badge>}
+                      {u.premium && <Badge variant="outline">tempo</Badge>}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <TimeAgo value={u.created_at} />
+                  </TableCell>
+                  <TableCell>
+                    <TimeAgo value={u.last_active_at} />
+                  </TableCell>
+                  <TableCell>
+                    <TimeAgo value={u.last_opened_at} />
+                  </TableCell>
+                  <TableCell className="pr-4 text-right">
+                    <div className="flex justify-end gap-1">
+                      {u.flags > 0 && <Badge variant="secondary">{u.flags} flagged</Badge>}
+                      {u.reports > 0 && <Badge variant="destructive">{u.reports} reported</Badge>}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+      {(page > 0 || more) && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                to={link({ page: page - 1 })}
+                aria-disabled={page === 0}
+                className={page === 0 ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                to={link({ page: page + 1 })}
+                aria-disabled={!more}
+                className={!more ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </Page>
   );
 }

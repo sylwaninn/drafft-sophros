@@ -1,0 +1,22 @@
+# Weekly bumps, into staging like any change: pinned actions, and npm packages grouped so one PR a week
+# carries the minor and patch updates.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: staging
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(sophros)
+  - package-ecosystem: npm
+    directory: /
+    target-branch: staging
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(sophros)
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
