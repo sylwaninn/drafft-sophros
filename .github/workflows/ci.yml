@@ -109,10 +109,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      # No install here: the audit reads the lockfile, so no pnpm store to cache.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
       - name: Known vulnerabilities in production dependencies (high and above)
         run: pnpm audit --prod --audit-level high
       - name: Secrets (whole history)
