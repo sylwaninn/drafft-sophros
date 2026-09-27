@@ -26,6 +26,9 @@ sophros is a standard shadcn/ui admin, deliberately separate from the drafft app
   through the rest of its set and the keys shown on screen.
 - The selfie check shows one case at a time: the selfie and one profile photo side by side at the same
   size, ← and → through the photos, the other cases waiting underneath.
+- Photo reviews and flagged media are queues, not lists: one item at a time, large, with the account
+  behind it alongside. Letters decide (shown on each button), ← → move, Z undoes. Decisions are staged
+  in a batch, undoable one by one, and applied together (⌘↵); leaving with staged decisions asks first.
 - Media never bleed to a card's edge: photo tiles stand on their own (ring, rounded-xl) with the caption
   below, and a radius nested inside padding is the outer radius minus the padding.
 
