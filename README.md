@@ -98,7 +98,11 @@ Per environment (`staging` first, then `production`):
    pnpm exec wrangler secret put STREAM_API_SECRET --env staging
    ```
    Give sophros its own secret key (Supabase > Settings > API keys) so it can be revoked alone.
-4. `pnpm run deploy:staging`, or `pnpm run deploy:production` (asks to type `production`).
+4. Deploys run from GitHub Actions (`.github/workflows/ci.yml`): every merge to `main` ships staging, a
+   `v*` tag ships production. The repository needs the secret `CLOUDFLARE_API_TOKEN` (Cloudflare > My
+   Profile > API Tokens > template "Edit Cloudflare Workers", this account and the `getdrafft.com` zone)
+   and the variable `CLOUDFLARE_ACCOUNT_ID`. By hand, from a machine logged in with `wrangler login`:
+   `pnpm run deploy:staging`, or `pnpm run deploy:production` (asks to type `production`).
 
 The Worker is only reachable on its custom domain, behind Access. A request without a valid Access token
 gets a 401, and a valid person who isn't in `private.staff` a 403.

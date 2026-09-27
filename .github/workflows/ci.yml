@@ -1,13 +1,25 @@
-# Types, tests and a production build on every change; secrets scan over the whole history.
+# Checks every change; ships main to staging and v* tags to production (sophros.getdrafft.com).
+#
+#   pull request      → types, tests, build, secrets scan
+#   push to main      → checks, then deploy the sophros-staging Worker
+#   push of a v* tag  → checks, then deploy the sophros-production Worker (environment: tags v* only)
+#
+# Wrangler needs CLOUDFLARE_API_TOKEN (secret) and CLOUDFLARE_ACCOUNT_ID (variable). The Workers' own
+# secrets (SUPABASE_SECRET_KEY, STREAM_API_*) are set once with `wrangler secret put` and stay there.
 name: ci
 
 on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -28,3 +40,47 @@ jobs:
       - run: pnpm build
       - name: Secrets (whole history)
         run: docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.28.0 git --no-banner --redact .
+
+  staging:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: staging
+      url: https://sophros-staging.getdrafft.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Deploy to staging
+        run: pnpm run deploy:staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+  production:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://sophros.getdrafft.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Deploy to production
+        run: CLOUDFLARE_ENV=production pnpm exec react-router build && pnpm exec wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
