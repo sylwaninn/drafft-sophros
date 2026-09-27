@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Form, useNavigate, useRevalidator, useSearchParams } from "react-router";
+import { Form, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
 import { CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -39,8 +39,12 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [openId, setOpenId] = useState<number | null>(null);
-  // A request closed while open leaves the "Open" list; the sheet keeps showing it until dismissed.
+  // A request closed while open leaves the "Open" list; the sheet keeps showing it until dismissed,
+  // read on its own (by reference, any status) so the reply just sent and the new status show. The
+  // fetcher is revalidated with the page, after each change and while a reply is being emailed.
   const [snapshot, setSnapshot] = useState<SupportRequest | null>(null);
+  const detached = useFetcher<typeof loader>();
+  const detachedFor = useRef<number | null>(null);
   const open = (r: SupportRequest) => {
     setSnapshot(r);
     setOpenId(r.id);
@@ -56,7 +60,15 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
     }
     navigate(`?${next}`, { replace: true, preventScrollReset: true });
   };
-  const selected = openId === null ? null : (requests.find((r) => r.id === openId) ?? (snapshot?.id === openId ? snapshot : null));
+  const listed = openId === null ? undefined : requests.find((r) => r.id === openId);
+  const detachedCopy = openId === null ? undefined : detached.data?.requests.find((r) => r.id === openId);
+  const selected = openId === null ? null : (listed ?? detachedCopy ?? (snapshot?.id === openId ? snapshot : null));
+  const reference = openId !== null && !listed && snapshot?.id === openId ? snapshot.reference : null;
+  useEffect(() => {
+    if (openId === null || reference === null || detachedFor.current === openId) return;
+    detachedFor.current = openId;
+    detached.load(`/support?${new URLSearchParams({ status: "all", q: reference })}`);
+  }, [openId, reference, detached]);
 
   return (
     <Page>
@@ -286,7 +298,8 @@ function Thread({ request: r }: { request: SupportRequest }) {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
-                  form.current?.requestSubmit();
+                  // One reply per press: not while one is on its way, nor on a held-down key.
+                  if (!pending && !e.repeat) form.current?.requestSubmit();
                 }
               }}
             />
