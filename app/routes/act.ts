@@ -51,7 +51,10 @@ export async function action({ request, context }: Route.ActionArgs) {
         });
         return result({ ok: true });
       case "flags":
-        await rpc(staff, "admin_resolve_flags", { p_ids: form.getAll("id").map(Number).filter(Number.isFinite), p_reason: text("reason") || null });
+        await rpc(staff, "admin_resolve_flags", {
+          p_ids: form.getAll("id").map(Number).filter(Number.isFinite),
+          p_reason: text("reason") || null,
+        });
         return result({ ok: true });
       case "report": {
         const hold = text("hold");
@@ -91,7 +94,8 @@ export async function action({ request, context }: Route.ActionArgs) {
         return result({ ok: false, error: `Unknown action ${intent}` }, 400);
     }
   } catch (error) {
-    if (error instanceof DbError) return result({ ok: false, error: errors[error.code] ?? error.message }, error.status === 403 ? 403 : 400);
+    if (error instanceof DbError)
+      return result({ ok: false, error: errors[error.code] ?? error.message }, error.status === 403 ? 403 : 400);
     console.error(`act ${intent}`, error);
     return result({ ok: false, error: error instanceof Error ? error.message : "Something went wrong." }, 500);
   }

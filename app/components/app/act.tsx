@@ -12,6 +12,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
 import {
@@ -22,6 +23,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "~/components/ui/dialog";
 import {
   DropdownMenu,
@@ -146,7 +148,6 @@ export function ReasonDialog({
             rows={3}
             defaultValue={defaultReason}
             placeholder={placeholder}
-            autoFocus
           />
           {required && <FieldDescription>Saved with your email in the audit log.</FieldDescription>}
         </Field>
@@ -178,8 +179,8 @@ export function ReasonDialog({
   if (destructive) {
     return (
       <>
-        {trigger && <span onClick={() => setOpen(true)}>{trigger}</span>}
         <AlertDialog open={isOpen} onOpenChange={setOpen}>
+          {trigger && <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>}
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{title}</AlertDialogTitle>
@@ -193,8 +194,8 @@ export function ReasonDialog({
   }
   return (
     <>
-      {trigger && <span onClick={() => setOpen(true)}>{trigger}</span>}
       <Dialog open={isOpen} onOpenChange={setOpen}>
+        {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
@@ -215,7 +216,10 @@ const restrictions: { state: Hold; label: string; icon: typeof ShieldBanIcon; de
 
 const unblockText: Record<Hold, { title: string; description: string }> = {
   review: { title: "Clear the review", description: "The account comes back as it was, and they're emailed that they're back." },
-  selfie: { title: "Drop the selfie request", description: "The account comes back without sending a selfie, and they're emailed that they're back." },
+  selfie: {
+    title: "Drop the selfie request",
+    description: "The account comes back without sending a selfie, and they're emailed that they're back.",
+  },
   banned: { title: "Lift the ban", description: "The account comes back, and its email, phone and sign-ins can be used again." },
 };
 
@@ -223,7 +227,17 @@ const unblockText: Record<Hold, { title: string; description: string }> = {
  * Restrict: puts a hold on the account (or a stricter one), each asking why; a ban asks in an alert
  * dialog. Moderators and admins.
  */
-export function RestrictMenu({ user, name, current, size = "default" }: { user: string; name: string; current: Hold | null; size?: "sm" | "default" }) {
+export function RestrictMenu({
+  user,
+  name,
+  current,
+  size = "default",
+}: {
+  user: string;
+  name: string;
+  current: Hold | null;
+  size?: "sm" | "default";
+}) {
   const { staff } = useRoot();
   const [chosen, setChosen] = useState<Hold | null>(null);
   if (!can(staff, "moderator") || current === "banned") return null;
@@ -268,7 +282,17 @@ export function RestrictMenu({ user, name, current, size = "default" }: { user: 
 }
 
 /** Unblock: lifts whatever hold the account is under, after a confirmation. A ban takes an admin. */
-export function UnblockButton({ user, name, current, size = "default" }: { user: string; name: string; current: Hold | null; size?: "sm" | "default" }) {
+export function UnblockButton({
+  user,
+  name,
+  current,
+  size = "default",
+}: {
+  user: string;
+  name: string;
+  current: Hold | null;
+  size?: "sm" | "default";
+}) {
   const { staff } = useRoot();
   if (!current || !can(staff, "moderator")) return null;
   const text = unblockText[current];
@@ -276,12 +300,10 @@ export function UnblockButton({ user, name, current, size = "default" }: { user:
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span tabIndex={0}>
-            <Button size={size} disabled>
-              <ShieldCheckIcon data-icon="inline-start" />
-              Unblock
-            </Button>
-          </span>
+          <Button size={size} aria-disabled="true" className="opacity-50" onClick={(e) => e.preventDefault()}>
+            <ShieldCheckIcon data-icon="inline-start" />
+            Unblock
+          </Button>
         </TooltipTrigger>
         <TooltipContent>Lifting a ban takes an admin</TooltipContent>
       </Tooltip>

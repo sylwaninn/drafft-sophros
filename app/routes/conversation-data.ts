@@ -11,7 +11,16 @@ import type { MatchRow } from "~/lib/types";
 import type { Route } from "./+types/conversation-data";
 
 export interface MatchDetail extends Omit<MatchRow, "sessions"> {
-  sessions: { id: string; sport: string; status: string; chosenAt: string | null; proposer: string; title: string; note: string; createdAt: string }[];
+  sessions: {
+    id: string;
+    sport: string;
+    status: string;
+    chosenAt: string | null;
+    proposer: string;
+    title: string;
+    note: string;
+    createdAt: string;
+  }[];
 }
 
 export interface ConversationData {

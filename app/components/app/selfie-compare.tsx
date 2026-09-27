@@ -77,8 +77,18 @@ export function SelfieCompare({
               <figcaption className="text-sm font-medium">Selfie</figcaption>
               <AspectRatio ratio={3 / 4} className="overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10">
                 {selfie ? (
-                  <button type="button" onClick={() => setViewer("selfie")} className="block size-full cursor-zoom-in" aria-label="Open the selfie larger">
-                    <img src={selfie} alt={`Verification selfie of ${name}`} referrerPolicy="no-referrer" className="size-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setViewer("selfie")}
+                    className="block size-full cursor-zoom-in"
+                    aria-label="Open the selfie larger"
+                  >
+                    <img
+                      src={selfie}
+                      alt={`Verification selfie of ${name}`}
+                      referrerPolicy="no-referrer"
+                      className="size-full object-cover"
+                    />
                   </button>
                 ) : (
                   <div className="flex size-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
@@ -91,9 +101,7 @@ export function SelfieCompare({
             <figure className="space-y-2">
               <figcaption className="flex items-center justify-between text-sm font-medium">
                 <span>Profile photo</span>
-                <span className="text-muted-foreground tabular-nums">
-                  {count ? `${at + 1} of ${count}` : "None"}
-                </span>
+                <span className="text-muted-foreground tabular-nums">{count ? `${at + 1} of ${count}` : "None"}</span>
               </figcaption>
               <AspectRatio ratio={3 / 4} className="overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10">
                 <AnimatePresence initial={false} custom={direction} mode="popLayout">
@@ -110,17 +118,34 @@ export function SelfieCompare({
                       className="absolute inset-0 block cursor-zoom-in"
                       aria-label="Open this photo larger"
                     >
-                      <img src={url(photo.key)} alt={`Profile photo ${at + 1} of ${name}`} referrerPolicy="no-referrer" className="size-full object-cover" />
+                      <img
+                        src={url(photo.key)}
+                        alt={`${name}, profile ${at + 1} of ${count}`}
+                        referrerPolicy="no-referrer"
+                        className="size-full object-cover"
+                      />
                     </motion.button>
                   )}
                 </AnimatePresence>
                 {photo && photo.status !== "approved" && <OverlayBadge>{photo.status}</OverlayBadge>}
                 {count > 1 && (
                   <>
-                    <Button variant="secondary" size="icon" className="absolute top-1/2 left-3 -translate-y-1/2 rounded-full shadow-sm" onClick={prev} aria-label="Previous photo">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-1/2 left-3 -translate-y-1/2 rounded-full shadow-sm"
+                      onClick={prev}
+                      aria-label="Previous photo"
+                    >
                       <ChevronLeftIcon />
                     </Button>
-                    <Button variant="secondary" size="icon" className="absolute top-1/2 right-3 -translate-y-1/2 rounded-full shadow-sm" onClick={next} aria-label="Next photo">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-1/2 right-3 -translate-y-1/2 rounded-full shadow-sm"
+                      onClick={next}
+                      aria-label="Next photo"
+                    >
                       <ChevronRightIcon />
                     </Button>
                   </>

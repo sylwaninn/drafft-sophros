@@ -111,7 +111,15 @@ export function PersonAvatar({ person, className }: { person: Pick<Person, "name
 }
 
 /** An account: photo, name linking to it, hold; hovering shows a larger preview. */
-export function PersonLink({ person, showHold = true, className }: { person: Person | null | undefined; showHold?: boolean; className?: string }) {
+export function PersonLink({
+  person,
+  showHold = true,
+  className,
+}: {
+  person: Person | null | undefined;
+  showHold?: boolean;
+  className?: string;
+}) {
   const url = useMediaUrl();
   if (!person) return <span className="text-muted-foreground">Nobody</span>;
   if (person.deleted) {
@@ -195,7 +203,10 @@ export function MediaTile({
   const [open, setOpen] = useState(false);
   const video = !!mediaKey && isVideo({ key: mediaKey, kind });
   return (
-    <AspectRatio ratio={ratio} className={cn("group/media relative overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10", className)}>
+    <AspectRatio
+      ratio={ratio}
+      className={cn("group/media relative overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10", className)}
+    >
       {!mediaKey ? (
         <div className="flex size-full items-center justify-center text-muted-foreground">
           <ImageOffIcon className="size-5" />
@@ -231,7 +242,15 @@ export function MediaTile({
 }
 
 /** A badge laid over a photo, readable on any picture. */
-export function OverlayBadge({ children, tone = "neutral", className }: { children: ReactNode; tone?: "neutral" | "danger"; className?: string }) {
+export function OverlayBadge({
+  children,
+  tone = "neutral",
+  className,
+}: {
+  children: ReactNode;
+  tone?: "neutral" | "danger";
+  className?: string;
+}) {
   return (
     <Badge
       variant="outline"

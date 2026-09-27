@@ -39,6 +39,12 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [openId, setOpenId] = useState<number | null>(null);
+  // A request closed while open leaves the "Open" list; the sheet keeps showing it until dismissed.
+  const [snapshot, setSnapshot] = useState<SupportRequest | null>(null);
+  const open = (r: SupportRequest) => {
+    setSnapshot(r);
+    setOpenId(r.id);
+  };
   const tab = params.get("tab") ?? "requests";
   const all = params.get("status") === "all";
   const q = params.get("q") ?? "";
@@ -50,11 +56,7 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
     }
     navigate(`?${next}`, { replace: true, preventScrollReset: true });
   };
-  // A request closed while open leaves the "Open" list; the sheet keeps showing it until dismissed.
-  const last = useRef<SupportRequest | null>(null);
-  const found = requests.find((r) => r.id === openId) ?? null;
-  if (found) last.current = found;
-  const selected = openId === null ? null : (found ?? (last.current?.id === openId ? last.current : null));
+  const selected = openId === null ? null : (requests.find((r) => r.id === openId) ?? (snapshot?.id === openId ? snapshot : null));
 
   return (
     <Page>
@@ -62,7 +64,13 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
         title="Support"
         description="Messages from the app's help forms, and data exports to send. Open a request to reply: the email leaves from here, in their language."
         actions={
-          <ToggleGroup type="single" variant="outline" size="sm" value={all ? "all" : "open"} onValueChange={(v) => v && set({ status: v === "all" ? "all" : null })}>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={all ? "all" : "open"}
+            onValueChange={(v) => v && set({ status: v === "all" ? "all" : null })}
+          >
             <ToggleGroupItem value="open">Open</ToggleGroupItem>
             <ToggleGroupItem value="all">All</ToggleGroupItem>
           </ToggleGroup>
@@ -97,7 +105,9 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
 
         <TabsContent value="requests" className="mt-4">
           {requests.length === 0 ? (
-            <Nothing title={q ? "Nothing matches" : "Inbox zero"}>{q ? "Try another reference or email." : "Every request has been handled."}</Nothing>
+            <Nothing title={q ? "Nothing matches" : "Inbox zero"}>
+              {q ? "Try another reference or email." : "Every request has been handled."}
+            </Nothing>
           ) : (
             <Card className="py-0">
               <Table>
@@ -113,14 +123,18 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
                 </TableHeader>
                 <TableBody>
                   {requests.map((s) => (
-                    <TableRow key={s.id} className="cursor-pointer" onClick={() => setOpenId(s.id)}>
+                    <TableRow key={s.id} className="cursor-pointer" onClick={() => open(s)}>
                       <TableCell className="pl-4 font-mono text-xs">{s.reference}</TableCell>
                       <TableCell className="font-medium">{s.topic}</TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {s.person ? <PersonLink person={s.person} /> : <span className="text-muted-foreground">{s.email}</span>}
                       </TableCell>
                       <TableCell className="max-w-80 truncate text-muted-foreground">
-                        {s.replies.length > 0 && <Badge variant="outline" className="mr-2">{s.replies.length} repl{s.replies.length === 1 ? "y" : "ies"}</Badge>}
+                        {s.replies.length > 0 && (
+                          <Badge variant="outline" className="mr-2">
+                            {s.replies.length} repl{s.replies.length === 1 ? "y" : "ies"}
+                          </Badge>
+                        )}
                         {s.message}
                       </TableCell>
                       <TableCell>
@@ -181,9 +195,7 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
       </Tabs>
 
       <Sheet open={!!selected} onOpenChange={(open) => !open && setOpenId(null)}>
-        <SheetContent className="gap-0 sm:max-w-xl">
-          {selected && <Thread request={selected} />}
-        </SheetContent>
+        <SheetContent className="gap-0 sm:max-w-xl">{selected && <Thread request={selected} />}</SheetContent>
       </Sheet>
     </Page>
   );

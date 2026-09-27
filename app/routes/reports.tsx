@@ -71,7 +71,12 @@ export default function Reports({ loaderData: { reports } }: Route.ComponentProp
             </TableHeader>
             <TableBody>
               {reports.map((r) => (
-                <TableRow key={r.id} className="cursor-pointer" onClick={() => setOpenId(r.id)} data-state={openId === r.id ? "selected" : undefined}>
+                <TableRow
+                  key={r.id}
+                  className="cursor-pointer"
+                  onClick={() => setOpenId(r.id)}
+                  data-state={openId === r.id ? "selected" : undefined}
+                >
                   <TableCell className="pl-4">
                     <Badge variant={r.reason === "underage" ? "destructive" : "secondary"}>{reasons[r.reason] ?? r.reason}</Badge>
                   </TableCell>
@@ -112,79 +117,79 @@ function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: (
   const moderator = can(staff, "moderator");
   return (
     <>
-    <ConversationDrawer matchId={reading} from={r ? `report ${r.id.slice(0, 8)}` : "report"} onClose={() => setReading(null)} />
-    <Sheet open={!!r} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-lg">
-        {r && (
-          <>
-            <SheetHeader>
-              <SheetTitle className="flex items-center gap-2">
-                <ShieldAlertIcon className="size-4" />
-                {reasons[r.reason] ?? r.reason}
-              </SheetTitle>
-              <SheetDescription>
-                Received <TimeAgo value={r.createdAt} exact />
-              </SheetDescription>
-            </SheetHeader>
-            <div className="grid gap-6 overflow-y-auto px-4">
-              <Facts
-                rows={[
-                  ["Reported", <PersonLink key="d" person={r.reported} />],
-                  ["By", <PersonLink key="r" person={r.reporter} showHold={false} />],
-                  ["Reporters, 30 days", String(r.reportedCount30d ?? 1)],
-                ]}
-              />
-              {r.details && <blockquote className="border-l-2 pl-4 text-sm whitespace-pre-wrap italic">{r.details}</blockquote>}
-              {r.match && moderator && (
-                <Button variant="outline" onClick={() => setReading(r.match ?? null)}>
-                  <MessagesSquareIcon data-icon="inline-start" />
-                  Read their conversation
-                </Button>
-              )}
-              {r.handledAt && (
+      <ConversationDrawer matchId={reading} from={r ? `report ${r.id.slice(0, 8)}` : "report"} onClose={() => setReading(null)} />
+      <Sheet open={!!r} onOpenChange={(open) => !open && onClose()}>
+        <SheetContent className="sm:max-w-lg">
+          {r && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <ShieldAlertIcon className="size-4" />
+                  {reasons[r.reason] ?? r.reason}
+                </SheetTitle>
+                <SheetDescription>
+                  Received <TimeAgo value={r.createdAt} exact />
+                </SheetDescription>
+              </SheetHeader>
+              <div className="grid gap-6 overflow-y-auto px-4">
                 <Facts
                   rows={[
-                    ["Closed", <TimeAgo key="c" value={r.handledAt} />],
-                    ["By", r.handledBy],
-                    ["Resolution", r.resolution],
+                    ["Reported", <PersonLink key="d" person={r.reported} />],
+                    ["By", <PersonLink key="r" person={r.reporter} showHold={false} />],
+                    ["Reporters, 30 days", String(r.reportedCount30d ?? 1)],
                   ]}
                 />
+                {r.details && <blockquote className="border-l-2 pl-4 text-sm whitespace-pre-wrap italic">{r.details}</blockquote>}
+                {r.match && moderator && (
+                  <Button variant="outline" onClick={() => setReading(r.match ?? null)}>
+                    <MessagesSquareIcon data-icon="inline-start" />
+                    Read their conversation
+                  </Button>
+                )}
+                {r.handledAt && (
+                  <Facts
+                    rows={[
+                      ["Closed", <TimeAgo key="c" value={r.handledAt} />],
+                      ["By", r.handledBy],
+                      ["Resolution", r.resolution],
+                    ]}
+                  />
+                )}
+              </div>
+              {!r.handledAt && moderator && r.reported && (
+                <SheetFooter>
+                  <ReasonDialog
+                    intent="report"
+                    fields={{ report: r.id, user: r.reported.id, hold: hold === "none" ? "" : hold }}
+                    reasonName="resolution"
+                    label="Resolution"
+                    placeholder="What you found and did"
+                    title="Close the report"
+                    description="The resolution goes to the audit log; the hold, if any, applies at once."
+                    submit={hold === "banned" ? "Ban and close" : "Close the report"}
+                    trigger={<Button className="w-full">Close the report</Button>}
+                  >
+                    <Field>
+                      <FieldLabel>Hold on {r.reported.name ?? "the account"}</FieldLabel>
+                      <Select value={hold} onValueChange={setHold}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No hold</SelectItem>
+                          <SelectItem value="review">Hold for review</SelectItem>
+                          <SelectItem value="selfie">Ask for a selfie</SelectItem>
+                          <SelectItem value="banned">Ban</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </ReasonDialog>
+                </SheetFooter>
               )}
-            </div>
-            {!r.handledAt && moderator && r.reported && (
-              <SheetFooter>
-                <ReasonDialog
-                  intent="report"
-                  fields={{ report: r.id, user: r.reported.id, hold: hold === "none" ? "" : hold }}
-                  reasonName="resolution"
-                  label="Resolution"
-                  placeholder="What you found and did"
-                  title="Close the report"
-                  description="The resolution goes to the audit log; the hold, if any, applies at once."
-                  submit={hold === "banned" ? "Ban and close" : "Close the report"}
-                  trigger={<Button className="w-full">Close the report</Button>}
-                >
-                  <Field>
-                    <FieldLabel>Hold on {r.reported.name ?? "the account"}</FieldLabel>
-                    <Select value={hold} onValueChange={setHold}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No hold</SelectItem>
-                        <SelectItem value="review">Hold for review</SelectItem>
-                        <SelectItem value="selfie">Ask for a selfie</SelectItem>
-                        <SelectItem value="banned">Ban</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                </ReasonDialog>
-              </SheetFooter>
-            )}
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

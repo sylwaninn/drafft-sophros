@@ -32,7 +32,13 @@ function QueueRow({ q, count }: { q: (typeof queues)[number]; count: QueueCount 
         <ItemContent>
           <ItemTitle>{q.title}</ItemTitle>
           <ItemDescription>
-            {waiting && count.oldest ? <>Oldest waiting since {ago(count.oldest).replace(" ago", "")}. {q.what}</> : q.what}
+            {waiting && count.oldest ? (
+              <>
+                Oldest waiting since {ago(count.oldest).replace(" ago", "")}. {q.what}
+              </>
+            ) : (
+              q.what
+            )}
           </ItemDescription>
         </ItemContent>
         <ItemActions>

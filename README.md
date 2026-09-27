@@ -27,11 +27,11 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
   trigger). Hiding a button here is comfort; the database decides.
 - **Roles**, each with the rights of the one before:
 
-  | Role | Can |
-  | --- | --- |
-  | `support` | accounts, support requests, reports (read), photo queue (read), notes, mark support handled and exports sent |
+  | Role        | Can                                                                                                                        |
+  | ----------- | -------------------------------------------------------------------------------------------------------------------------- |
+  | `support`   | accounts, support requests, reports (read), photo queue (read), notes, mark support handled and exports sent               |
   | `moderator` | holds (review, selfie, ban), photos, flagged media, reports, conversations, selfies, sign-out everywhere, message deletion |
-  | `admin` | lifting a ban, staff, the whole audit log |
+  | `admin`     | lifting a ban, staff, the whole audit log                                                                                  |
 
 - **Sensitive reads are logged too:** opening an account (`user.view`), a selfie (`selfie.view`), a
   conversation (`conversation.view`, on both accounts, with where it was opened from). Each account page
@@ -40,18 +40,18 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
 
 ## Pages
 
-| Page | What for |
-| --- | --- |
-| Queues | every queue with its size and oldest case, the longest waiting first; accounts on hold |
-| Accounts | search by name, email, phone digits or id; filters (held, flagged, reported, tempo) |
-| Account | profile and photos, email and phone, sign-in methods, sessions (IP, client), devices (model, iOS, app version, locale, time zone, IP, country, opens, last opened), IPs, approximate location, usage, holds and their history, reports, blocks, flagged media, related accounts (same install, IP or marked identity), matches, wallet and purchases, support, notes, staff trail; hold, sign out everywhere, approve or refuse photos |
-| Verifications | selfie next to the profile photos (lift, ask again, ban), accounts in review with their cause, selfies still owed |
-| Reports | open reports with both people, the count of reporters, their conversation; close with a resolution and an optional hold |
-| Support | help-form messages with their thread; replies are written here and emailed by the backend in the person's language; data exports to send |
-| Profile photos | one by one: pending photos (approve, refuse) and ones refused automatically (keep, approve anyway); refuse and hold or ban |
-| Shared media | one by one: chat photos the silent check flagged, already delivered; act on the sender (fine, hold, selfie, ban); history and most flagged |
-| Conversations | every match, filtered by person, name or email, status, a report between them, flagged chat photos, sessions; a conversation opens with a reason; delete a message |
-| Audit log, Staff | admins |
+| Page             | What for                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Queues           | every queue with its size and oldest case, the longest waiting first; accounts on hold                                                                                                                                                                                                                                                                                                                                                 |
+| Accounts         | search by name, email, phone digits or id; filters (held, flagged, reported, tempo)                                                                                                                                                                                                                                                                                                                                                    |
+| Account          | profile and photos, email and phone, sign-in methods, sessions (IP, client), devices (model, iOS, app version, locale, time zone, IP, country, opens, last opened), IPs, approximate location, usage, holds and their history, reports, blocks, flagged media, related accounts (same install, IP or marked identity), matches, wallet and purchases, support, notes, staff trail; hold, sign out everywhere, approve or refuse photos |
+| Verifications    | selfie next to the profile photos (lift, ask again, ban), accounts in review with their cause, selfies still owed                                                                                                                                                                                                                                                                                                                      |
+| Reports          | open reports with both people, the count of reporters, their conversation; close with a resolution and an optional hold                                                                                                                                                                                                                                                                                                                |
+| Support          | help-form messages with their thread; replies are written here and emailed by the backend in the person's language; data exports to send                                                                                                                                                                                                                                                                                               |
+| Profile photos   | one by one: pending photos (approve, refuse) and ones refused automatically (keep, approve anyway); refuse and hold or ban                                                                                                                                                                                                                                                                                                             |
+| Shared media     | one by one: chat photos the silent check flagged, already delivered; act on the sender (fine, hold, selfie, ban); history and most flagged                                                                                                                                                                                                                                                                                             |
+| Conversations    | every match, filtered by person, name or email, status, a report between them, flagged chat photos, sessions; a conversation opens with a reason; delete a message                                                                                                                                                                                                                                                                     |
+| Audit log, Staff | admins                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ## Local development
 

@@ -36,13 +36,27 @@ export const nav: NavItem[] = [
     role: "support",
     count: (q) => q.selfies.count + q.reviews.count,
   },
-  { to: "/profile-photos", label: "Profile photos", icon: SquareUserRoundIcon, group: "Moderation", role: "support", count: (q) => q.photos.count },
+  {
+    to: "/profile-photos",
+    label: "Profile photos",
+    icon: SquareUserRoundIcon,
+    group: "Moderation",
+    role: "support",
+    count: (q) => q.photos.count,
+  },
   { to: "/shared-media", label: "Shared media", icon: ImageIcon, group: "Moderation", role: "moderator", count: (q) => q.flags.count },
   { to: "/reports", label: "Reports", icon: ShieldAlertIcon, group: "Moderation", role: "support", count: (q) => q.reports.count },
   { to: "/accounts", label: "Accounts", icon: UsersIcon, group: "Investigate", role: "support" },
   { to: "/conversations", label: "Conversations", icon: MessagesSquareIcon, group: "Investigate", role: "moderator" },
   { to: "/support", label: "Requests", icon: LifeBuoyIcon, group: "Support", role: "support", count: (q) => q.support.count },
-  { to: "/support?tab=exports", label: "Data exports", icon: DownloadIcon, group: "Support", role: "support", count: (q) => q.exports.count },
+  {
+    to: "/support?tab=exports",
+    label: "Data exports",
+    icon: DownloadIcon,
+    group: "Support",
+    role: "support",
+    count: (q) => q.exports.count,
+  },
   { to: "/audit", label: "Audit log", icon: FileClockIcon, group: "Admin", role: "admin" },
   { to: "/staff", label: "Staff", icon: UserCogIcon, group: "Admin", role: "admin" },
 ];
@@ -54,7 +68,9 @@ export function isActive(item: NavItem, pathname: string, search: string) {
   if (!pathname.startsWith(path)) return false;
   const tab = new URLSearchParams(search).get("tab");
   const itemTab = query ? new URLSearchParams(query).get("tab") : null;
-  return itemTab ? tab === itemTab : !nav.some((n) => n !== item && n.to.startsWith(`${path}?`) && tab === new URLSearchParams(n.to.split("?")[1]).get("tab"));
+  return itemTab
+    ? tab === itemTab
+    : !nav.some((n) => n !== item && n.to.startsWith(`${path}?`) && tab === new URLSearchParams(n.to.split("?")[1]).get("tab"));
 }
 
 export function useVisibleNav() {

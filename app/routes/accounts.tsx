@@ -101,7 +101,12 @@ export default function Accounts({ loaderData: { rows, more, page } }: Route.Com
               {rows.map((u) => (
                 <TableRow key={u.id} className="group/row">
                   <TableCell className="pl-4">
-                    <Link to={`/accounts/${u.id}`} viewTransition prefetch="intent" className="flex items-center gap-2 font-medium group-hover/row:underline">
+                    <Link
+                      to={`/accounts/${u.id}`}
+                      viewTransition
+                      prefetch="intent"
+                      className="flex items-center gap-2 font-medium group-hover/row:underline"
+                    >
                       <PersonAvatar person={u} className="size-7" />
                       {u.name || <span className="text-muted-foreground">No name yet</span>}
                     </Link>
@@ -143,10 +148,18 @@ export default function Accounts({ loaderData: { rows, more, page } }: Route.Com
         <Pagination>
           <PaginationContent>
             <PaginationItem>
-              <PaginationPrevious to={link({ page: page - 1 })} aria-disabled={page === 0} className={page === 0 ? "pointer-events-none opacity-50" : undefined} />
+              <PaginationPrevious
+                to={link({ page: page - 1 })}
+                aria-disabled={page === 0}
+                className={page === 0 ? "pointer-events-none opacity-50" : undefined}
+              />
             </PaginationItem>
             <PaginationItem>
-              <PaginationNext to={link({ page: page + 1 })} aria-disabled={!more} className={!more ? "pointer-events-none opacity-50" : undefined} />
+              <PaginationNext
+                to={link({ page: page + 1 })}
+                aria-disabled={!more}
+                className={!more ? "pointer-events-none opacity-50" : undefined}
+              />
             </PaginationItem>
           </PaginationContent>
         </Pagination>

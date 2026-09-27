@@ -3,7 +3,16 @@ import { UserPlusIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
@@ -41,7 +50,9 @@ function RoleSelect({ member }: { member: Member }) {
   return (
     <Select
       value={value}
-      onValueChange={(role) => fetcher.submit({ intent: "staff", email: member.email, role: role === "disabled" ? "" : role }, { method: "post", action: "/act" })}
+      onValueChange={(role) =>
+        fetcher.submit({ intent: "staff", email: member.email, role: role === "disabled" ? "" : role }, { method: "post", action: "/act" })
+      }
     >
       <SelectTrigger size="sm" className="w-36" aria-label={`Role of ${member.email}`}>
         <SelectValue />
@@ -79,7 +90,7 @@ function AddStaff() {
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="staff-email">Email</FieldLabel>
-              <Input id="staff-email" name="email" type="email" required autoFocus placeholder="name@getdrafft.com" />
+              <Input id="staff-email" name="email" type="email" required placeholder="name@getdrafft.com" />
               <FieldDescription>The one their Access sign-in uses.</FieldDescription>
             </Field>
             <Field>

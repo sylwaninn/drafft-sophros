@@ -31,7 +31,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Textarea } from "~/components/ui/textarea";
 import { ActButton, HoldControls, ReasonDialog, useAct } from "~/components/app/act";
-import { Facts, HoldBadge, Id, MediaTile, Nothing, OverlayBadge, Page, Panel, PersonAvatar, PersonLink, TimeAgo } from "~/components/app/bits";
+import {
+  Facts,
+  HoldBadge,
+  Id,
+  MediaTile,
+  Nothing,
+  OverlayBadge,
+  Page,
+  Panel,
+  PersonAvatar,
+  PersonLink,
+  TimeAgo,
+} from "~/components/app/bits";
 import { ConversationDrawer } from "~/components/app/conversation-drawer";
 import { age } from "~/components/app/format";
 import { useMediaUrl, useRoot } from "~/components/app/root-data";
@@ -175,7 +187,12 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
                 ["Last sign-in", <TimeAgo key="s" value={u.auth.lastSignInAt} />],
                 ["Last active", <TimeAgo key="a" value={p.last_active_at} />],
                 ["Last opened", <TimeAgo key="o" value={u.devices[0]?.last_seen_at} />],
-                ["Language", <span key="l" className="uppercase">{p.language}</span>],
+                [
+                  "Language",
+                  <span key="l" className="uppercase">
+                    {p.language}
+                  </span>,
+                ],
               ]}
             />
           </Panel>
@@ -209,7 +226,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
 }
 
 function MoreMenu({ u, moderator }: { u: UserDetail; moderator: boolean }) {
-  const revoke = useRef<HTMLSpanElement>(null);
+  const [revoking, setRevoking] = useState(false);
   return (
     <>
       <DropdownMenu>
@@ -237,7 +254,7 @@ function MoreMenu({ u, moderator }: { u: UserDetail; moderator: boolean }) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setTimeout(() => revoke.current?.click())}>
+              <DropdownMenuItem onSelect={() => setRevoking(true)}>
                 <LogOutIcon />
                 Sign out everywhere
               </DropdownMenuItem>
@@ -252,7 +269,8 @@ function MoreMenu({ u, moderator }: { u: UserDetail; moderator: boolean }) {
           title="Sign out everywhere"
           description={`Ends ${u.sessions.length} open session${u.sessions.length === 1 ? "" : "s"}. The app asks them to sign in again within the hour.`}
           submit="Sign out everywhere"
-          trigger={<span ref={revoke} className="hidden" />}
+          open={revoking}
+          onOpenChange={setRevoking}
         />
       )}
     </>
@@ -281,7 +299,12 @@ function ProfileTab({ u, moderator }: { u: UserDetail; moderator: boolean }) {
                   mediaKey={m.key}
                   kind={m.kind}
                   posterKey={m.posterKey}
-                  gallery={u.media.map((x, i) => ({ key: x.key, kind: x.kind, posterKey: x.posterKey, caption: `Photo ${i + 1} of ${u.media.length}, ${x.status}` }))}
+                  gallery={u.media.map((x, i) => ({
+                    key: x.key,
+                    kind: x.kind,
+                    posterKey: x.posterKey,
+                    caption: `Photo ${i + 1} of ${u.media.length}, ${x.status}`,
+                  }))}
                   index={u.media.indexOf(m)}
                   title={`${p.name || "Their"} photos`}
                 >
@@ -790,7 +813,14 @@ function NotesTab({ u, audit }: { u: UserDetail; audit: AuditEntry[] | null }) {
             <FieldLabel htmlFor="note-body" className="sr-only">
               Note
             </FieldLabel>
-            <Textarea id="note-body" name="body" required rows={3} maxLength={2000} placeholder="What the next person to open this account should know" />
+            <Textarea
+              id="note-body"
+              name="body"
+              required
+              rows={3}
+              maxLength={2000}
+              placeholder="What the next person to open this account should know"
+            />
           </Field>
           <div className="flex justify-end">
             <Button type="submit" disabled={pending}>

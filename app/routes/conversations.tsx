@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { Form, Link, useFetcher, useNavigate, useSearchParams } from "react-router";
-import { ArrowRightIcon, CalendarIcon, FlagIcon, MessagesSquareIcon, SearchIcon, ShieldAlertIcon, UserRoundIcon, XIcon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  CalendarIcon,
+  FlagIcon,
+  MessagesSquareIcon,
+  SearchIcon,
+  ShieldAlertIcon,
+  UserRoundIcon,
+  XIcon,
+} from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
@@ -84,7 +93,9 @@ function PersonFilter({ person, onPick }: { person: Person | null; onPick: (id: 
         <Command shouldFilter={false}>
           <CommandInput value={q} onValueChange={setQ} placeholder="Name, email, phone or id" />
           <CommandList>
-            <CommandEmpty>{q.trim().length < 2 ? "Type a name or an email" : fetcher.state === "loading" ? "Searching" : "No account matches."}</CommandEmpty>
+            <CommandEmpty>
+              {q.trim().length < 2 ? "Type a name or an email" : fetcher.state === "loading" ? "Searching" : "No account matches."}
+            </CommandEmpty>
             {accounts.length > 0 && (
               <CommandGroup>
                 {accounts.map((a) => (
@@ -170,7 +181,13 @@ export default function Conversations({ loaderData: { rows, more, page, person }
           variant="outline"
           size="sm"
           value={flags}
-          onValueChange={(v) => set({ reported: v.includes("reported") ? "1" : null, flagged: v.includes("flagged") ? "1" : null, sessions: v.includes("sessions") ? "1" : null })}
+          onValueChange={(v) =>
+            set({
+              reported: v.includes("reported") ? "1" : null,
+              flagged: v.includes("flagged") ? "1" : null,
+              sessions: v.includes("sessions") ? "1" : null,
+            })
+          }
         >
           <ToggleGroupItem value="reported">
             <ShieldAlertIcon />
@@ -213,7 +230,12 @@ export default function Conversations({ loaderData: { rows, more, page, person }
             </TableHeader>
             <TableBody>
               {rows.map((m) => (
-                <TableRow key={m.id} className="cursor-pointer" data-state={params.get("open") === m.id ? "selected" : undefined} onClick={() => set({ open: m.id })}>
+                <TableRow
+                  key={m.id}
+                  className="cursor-pointer"
+                  data-state={params.get("open") === m.id ? "selected" : undefined}
+                  onClick={() => set({ open: m.id })}
+                >
                   <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
                     <PersonLink person={m.a} />
                   </TableCell>
@@ -248,7 +270,11 @@ export default function Conversations({ loaderData: { rows, more, page, person }
         <Pagination>
           <PaginationContent>
             <PaginationItem>
-              <PaginationPrevious to={at(page - 1)} aria-disabled={page === 0} className={page === 0 ? "pointer-events-none opacity-50" : undefined} />
+              <PaginationPrevious
+                to={at(page - 1)}
+                aria-disabled={page === 0}
+                className={page === 0 ? "pointer-events-none opacity-50" : undefined}
+              />
             </PaginationItem>
             <PaginationItem>
               <PaginationNext to={at(page + 1)} aria-disabled={!more} className={!more ? "pointer-events-none opacity-50" : undefined} />

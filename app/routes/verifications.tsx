@@ -151,7 +151,10 @@ export default function Verifications({ loaderData: { queue, selfies } }: Route.
 /** The case in front (the oldest, or the one picked), and the ones waiting after it. */
 function SelfieQueue({ queue, selfies, focus }: { queue: Queue; selfies: Record<string, (string | null)[]>; focus: string | null }) {
   const { staff } = useRoot();
-  const index = Math.max(0, queue.selfies.findIndex((s) => s.person.id === focus));
+  const index = Math.max(
+    0,
+    queue.selfies.findIndex((s) => s.person.id === focus),
+  );
   const current = queue.selfies[index];
   const rest = queue.selfies.filter((_, i) => i !== index);
   return (

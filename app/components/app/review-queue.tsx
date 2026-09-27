@@ -1,6 +1,6 @@
 // A review queue: one item at a time, large, with everything needed to decide next to it. A decision
 // applies at once (keyboard letter or button); the item leaves and the next one slides in.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useEffectEvent, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { type LucideIcon, ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -94,26 +94,23 @@ export function ReviewQueue<T>({
   );
 
   // Keyboard: ← → move, a letter decides.
-  const handlers = useRef({ go, decide, at, actions, current });
-  handlers.current = { go, decide, at, actions, current };
+  const onKey = useEffectEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+    if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "ArrowLeft") return (event.preventDefault(), go(at - 1));
+    if (event.key === "ArrowRight") return (event.preventDefault(), go(at + 1));
+    const key = event.key.toLowerCase();
+    const action = actions.find((a) => a.key === key && (!a.available || (current && a.available(current))));
+    if (action) {
+      event.preventDefault();
+      decide(action);
+    }
+  });
   useEffect(() => {
-    const down = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
-      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const h = handlers.current;
-      if (event.key === "ArrowLeft") return (event.preventDefault(), h.go(h.at - 1));
-      if (event.key === "ArrowRight") return (event.preventDefault(), h.go(h.at + 1));
-      const key = event.key.toLowerCase();
-      const action = h.actions.find((a) => a.key === key && (!a.available || (h.current && a.available(h.current))));
-      if (action) {
-        event.preventDefault();
-        h.decide(action);
-      }
-    };
-    window.addEventListener("keydown", down);
-    return () => window.removeEventListener("keydown", down);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   if (!current) {
@@ -169,7 +166,11 @@ export function ReviewQueue<T>({
             <CardFooter className="flex flex-wrap items-center gap-2 border-t">
               {shown.map((a) => (
                 <Button key={a.id} variant={a.variant ?? "outline"} disabled={pending} onClick={() => decide(a)}>
-                  {pending && fetcher.formData?.get("message") === a.done ? <Spinner data-icon="inline-start" /> : <a.icon data-icon="inline-start" />}
+                  {pending && fetcher.formData?.get("message") === a.done ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <a.icon data-icon="inline-start" />
+                  )}
                   {a.label}
                   <Kbd className="ml-1">{a.key.toUpperCase()}</Kbd>
                 </Button>
@@ -210,7 +211,17 @@ export function ReviewQueue<T>({
 }
 
 /** The reason a decision needs first (a ban). */
-function ReasonPrompt<T>({ action, item, onCancel, onConfirm }: { action: ReviewAction<T>; item: T; onCancel: () => void; onConfirm: (reason: string) => void }) {
+function ReasonPrompt<T>({
+  action,
+  item,
+  onCancel,
+  onConfirm,
+}: {
+  action: ReviewAction<T>;
+  item: T;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void;
+}) {
   const [reason, setReason] = useState("");
   const prompt = action.prompt!;
   const submit = () => reason.trim() && onConfirm(reason.trim());
@@ -232,7 +243,6 @@ function ReasonPrompt<T>({ action, item, onCancel, onConfirm }: { action: Review
             <FieldLabel htmlFor="decision-reason">Reason</FieldLabel>
             <Textarea
               id="decision-reason"
-              autoFocus
               required
               rows={3}
               maxLength={1000}

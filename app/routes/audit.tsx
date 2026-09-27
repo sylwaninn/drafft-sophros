@@ -19,7 +19,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export default function Audit({ loaderData: { rows, more, page } }: Route.ComponentProps) {
   return (
     <Page>
-      <PageHeader title="Audit log" description="Everything the staff did or opened, newest first. It can't be edited or deleted, by anyone." />
+      <PageHeader
+        title="Audit log"
+        description="Everything the staff did or opened, newest first. It can't be edited or deleted, by anyone."
+      />
       {rows.length === 0 ? (
         <Nothing title="Nothing yet" />
       ) : (
@@ -68,10 +71,18 @@ export default function Audit({ loaderData: { rows, more, page } }: Route.Compon
         <Pagination>
           <PaginationContent>
             <PaginationItem>
-              <PaginationPrevious to={`?page=${page - 1}`} aria-disabled={page === 0} className={page === 0 ? "pointer-events-none opacity-50" : undefined} />
+              <PaginationPrevious
+                to={`?page=${page - 1}`}
+                aria-disabled={page === 0}
+                className={page === 0 ? "pointer-events-none opacity-50" : undefined}
+              />
             </PaginationItem>
             <PaginationItem>
-              <PaginationNext to={`?page=${page + 1}`} aria-disabled={!more} className={!more ? "pointer-events-none opacity-50" : undefined} />
+              <PaginationNext
+                to={`?page=${page + 1}`}
+                aria-disabled={!more}
+                className={!more ? "pointer-events-none opacity-50" : undefined}
+              />
             </PaginationItem>
           </PaginationContent>
         </Pagination>

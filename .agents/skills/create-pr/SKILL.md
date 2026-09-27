@@ -160,6 +160,7 @@ git diff main...HEAD --name-only
    - `apps/mobile/eas.json`
 
 **How to apply:**
+
 - If native changes detected, append ` [native]` to the PR title
 - Example: `feat(mobile): add camera support [native]`
 - If mixed mobile+web PR with native mobile changes, still append `[native]`

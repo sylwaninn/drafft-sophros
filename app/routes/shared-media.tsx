@@ -152,8 +152,7 @@ export default function SharedMedia({ loaderData: { flags, users, history } }: R
                     ]}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Delivered to the person they wrote to; the check only records it. To see where it was sent, open their
-                    conversations.
+                    Delivered to the person they wrote to; the check only records it. To see where it was sent, open their conversations.
                   </p>
                 </div>
               </Panel>
@@ -177,7 +176,10 @@ function History({ flags, users }: { flags: Flag[]; users: FlaggedUser[] }) {
             <div key={f.id} className="space-y-3">
               <MediaTile
                 mediaKey={f.key}
-                gallery={flags.map((x) => ({ key: x.key, caption: `${x.person?.name ?? "Someone"}, ${x.context}: ${x.labels.join(", ")}` }))}
+                gallery={flags.map((x) => ({
+                  key: x.key,
+                  caption: `${x.person?.name ?? "Someone"}, ${x.context}: ${x.labels.join(", ")}`,
+                }))}
                 index={i}
                 title="Flagged media"
                 className="rounded-xl"

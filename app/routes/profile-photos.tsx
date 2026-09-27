@@ -37,7 +37,11 @@ const refused = (m: ProfilePhoto) => m.state === "refused";
 const holdable = (m: ProfilePhoto) => m.person.moderation !== "banned";
 /** A pending photo is refused with the account decision; an already refused one only has its flags closed. */
 const settle = (m: ProfilePhoto, reason: string): BatchOp[] =>
-  pending(m) ? [{ intent: "media", media: m.id, approved: false, reason }] : m.flagIds.length ? [{ intent: "flags", ids: m.flagIds, reason }] : [];
+  pending(m)
+    ? [{ intent: "media", media: m.id, approved: false, reason }]
+    : m.flagIds.length
+      ? [{ intent: "flags", ids: m.flagIds, reason }]
+      : [];
 
 const actions: ReviewAction<ProfilePhoto>[] = [
   {
@@ -119,7 +123,13 @@ export default function ProfilePhotos({ loaderData: { photos } }: Route.Componen
         title={(m) => (
           <span className="flex items-center gap-2">
             {m.person.name || "No name yet"}, photo {m.position + 1}
-            {refused(m) ? <Badge variant="destructive">Refused automatically</Badge> : m.reviewRequestedAt ? <Badge>Second look asked</Badge> : <Badge variant="secondary">Borderline</Badge>}
+            {refused(m) ? (
+              <Badge variant="destructive">Refused automatically</Badge>
+            ) : m.reviewRequestedAt ? (
+              <Badge>Second look asked</Badge>
+            ) : (
+              <Badge variant="secondary">Borderline</Badge>
+            )}
           </span>
         )}
         itemNoun="Photo"

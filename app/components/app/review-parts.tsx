@@ -22,7 +22,19 @@ export interface AccountBrief {
 }
 
 /** The item under review, as large as the screen allows; a click opens it full size. */
-export function ReviewStage({ mediaKey, kind, posterKey, caption, children }: { mediaKey: string; kind?: string; posterKey?: string | null; caption: string; children?: ReactNode }) {
+export function ReviewStage({
+  mediaKey,
+  kind,
+  posterKey,
+  caption,
+  children,
+}: {
+  mediaKey: string;
+  kind?: string;
+  posterKey?: string | null;
+  caption: string;
+  children?: ReactNode;
+}) {
   const url = useMediaUrl();
   const [open, setOpen] = useState(false);
   const video = isVideo({ key: mediaKey, kind });
@@ -31,7 +43,12 @@ export function ReviewStage({ mediaKey, kind, posterKey, caption, children }: { 
       {video ? (
         <video key={mediaKey} src={url(mediaKey)} poster={url(posterKey)} controls className="max-h-full max-w-full" />
       ) : (
-        <button type="button" onClick={() => setOpen(true)} className="flex size-full cursor-zoom-in items-center justify-center" aria-label="Open full size">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex size-full cursor-zoom-in items-center justify-center"
+          aria-label="Open full size"
+        >
           <img src={url(mediaKey)} alt={caption} referrerPolicy="no-referrer" className="max-h-full max-w-full object-contain" />
         </button>
       )}
@@ -93,7 +110,11 @@ export function AccountPanel({ person, brief, highlight }: { person: Person | nu
                   title={`${person.name || "Their"} photos`}
                   className={p.key === highlight ? "ring-2 ring-primary" : undefined}
                 >
-                  {p.status !== "approved" && <span className="absolute inset-x-0 bottom-0 bg-background/85 py-0.5 text-center text-[10px] capitalize">{p.status}</span>}
+                  {p.status !== "approved" && (
+                    <span className="absolute inset-x-0 bottom-0 bg-background/85 py-0.5 text-center text-[10px] capitalize">
+                      {p.status}
+                    </span>
+                  )}
                 </MediaTile>
               ))}
             </div>
