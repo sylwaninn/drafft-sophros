@@ -17,6 +17,18 @@ sophros is a standard shadcn/ui admin, deliberately separate from the drafft app
 - **Holds** are the only semantic colours: `--review` (amber), `--selfie` (sky), `--banned` (red),
   `--cleared` (green), as tinted secondary badges with an icon (`HoldBadge`).
 
+## Holds and photos
+
+- Two controls on an account, always: **Restrict** (menu: hold for review, ask for a selfie, ban; each
+  asks why, a ban in an alert dialog) and **Unblock** (shown when the account is held; confirms and asks
+  why; lifting a ban takes an admin).
+- A photo never opens a new tab: clicking one opens it large in a dialog (`PhotoViewer`), with ← and →
+  through the rest of its set and the keys shown on screen.
+- The selfie check shows one case at a time: the selfie and one profile photo side by side at the same
+  size, ← and → through the photos, the other cases waiting underneath.
+- Media never bleed to a card's edge: photo tiles stand on their own (ring, rounded-xl) with the caption
+  below, and a radius nested inside padding is the outer radius minus the padding.
+
 ## Motion
 
 - One authored moment: a resolved case leaves its queue (fade, slight scale, blur) while the rest close

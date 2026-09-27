@@ -1,6 +1,7 @@
 // A match's conversation, read from Stream. Opening it takes a reason, logged on both accounts with the
 // staff member's email before a single message is fetched (admin_log, conversation.view), at every
 // loading, older pages included.
+import { useState } from "react";
 import { Form, Link, useSearchParams } from "react-router";
 import { ArrowUpIcon, CalendarIcon, LockIcon, Trash2Icon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
@@ -14,6 +15,7 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { ReasonDialog } from "~/components/app/act";
 import { Nothing, Page, PageHeader, Panel, PersonAvatar, PersonLink, TimeAgo } from "~/components/app/bits";
 import { formatDate } from "~/components/app/format";
+import { PhotoViewer } from "~/components/app/photo-viewer";
 import { staffContext } from "~/lib/context";
 import { getConfig } from "~/lib/.server/config";
 import { query, rpc } from "~/lib/.server/db";
@@ -184,6 +186,25 @@ export default function Conversation({ loaderData: { match, reason, messages, er
   );
 }
 
+/** A photo sent in the chat; it opens large in a dialog. */
+function ChatImage({ thumb, full, author }: { thumb: string; full: string; author?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="mt-1 block cursor-zoom-in overflow-hidden rounded-lg" aria-label="Open the photo larger">
+        <img src={thumb} alt="" referrerPolicy="no-referrer" loading="lazy" className="max-h-64" />
+      </button>
+      <PhotoViewer
+        items={[{ key: full, src: full, caption: author ? `Sent by ${author}` : undefined }]}
+        index={0}
+        open={open}
+        onOpenChange={setOpen}
+        title="Photo sent in the chat"
+      />
+    </>
+  );
+}
+
 /** Attachment links come from the sender's client: only web addresses. */
 function safe(url: string | undefined) {
   return url && /^https?:\/\//i.test(url) ? url : undefined;
@@ -217,9 +238,7 @@ function Bubble({ message: m, author, left, matchId }: { message: ChatMessage; a
           {m.text && <p className="break-words whitespace-pre-wrap">{m.text}</p>}
           {m.attachments?.map((a, i) =>
             safe(a.image_url) || safe(a.thumb_url) ? (
-              <a key={i} href={safe(a.image_url) ?? safe(a.thumb_url)} target="_blank" rel="noreferrer noopener">
-                <img src={safe(a.thumb_url) ?? safe(a.image_url)} alt="" referrerPolicy="no-referrer" loading="lazy" className="mt-1 max-h-64 rounded-lg" />
-              </a>
+              <ChatImage key={i} thumb={(safe(a.thumb_url) ?? safe(a.image_url))!} full={(safe(a.image_url) ?? safe(a.thumb_url))!} author={author?.name} />
             ) : safe(a.asset_url) ? (
               <a key={i} href={safe(a.asset_url)} target="_blank" rel="noreferrer noopener" className="mt-1 block underline">
                 {a.title || a.type || "Attachment"}

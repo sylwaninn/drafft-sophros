@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
-import { ChevronDownIcon, ScanFaceIcon, ShieldBanIcon, ShieldCheckIcon, ShieldQuestionIcon } from "lucide-react";
+import { ChevronDownIcon, ScanFaceIcon, ShieldBanIcon, ShieldCheckIcon, ShieldIcon, ShieldQuestionIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -34,6 +34,7 @@ import {
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "~/components/ui/field";
 import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
 import { can } from "~/lib/roles";
 import type { Hold } from "~/lib/types";
 import type { ActResult } from "~/routes/act";
@@ -206,40 +207,43 @@ export function ReasonDialog({
   );
 }
 
-const holdChoices: { state: Hold | ""; label: string; icon: typeof ShieldBanIcon; description: string }[] = [
+const restrictions: { state: Hold; label: string; icon: typeof ShieldBanIcon; description: string }[] = [
   { state: "review", label: "Hold for review", icon: ShieldQuestionIcon, description: "Freezes the account until someone clears it." },
   { state: "selfie", label: "Ask for a selfie", icon: ScanFaceIcon, description: "Freezes the account until they send a selfie." },
-  { state: "", label: "Lift the hold", icon: ShieldCheckIcon, description: "Gives the account back and emails them." },
   { state: "banned", label: "Ban", icon: ShieldBanIcon, description: "Closes it for good: its email, phone and sign-ins can't come back." },
 ];
 
-/** The hold menu of an account: each choice asks why, a ban in an alert dialog. */
-export function HoldMenu({ user, name, current, size = "default" }: { user: string; name: string; current: Hold | null; size?: "sm" | "default" }) {
+const unblockText: Record<Hold, { title: string; description: string }> = {
+  review: { title: "Clear the review", description: "The account comes back as it was, and they're emailed that they're back." },
+  selfie: { title: "Drop the selfie request", description: "The account comes back without sending a selfie, and they're emailed that they're back." },
+  banned: { title: "Lift the ban", description: "The account comes back, and its email, phone and sign-ins can be used again." },
+};
+
+/**
+ * Restrict: puts a hold on the account (or a stricter one), each asking why; a ban asks in an alert
+ * dialog. Moderators and admins.
+ */
+export function RestrictMenu({ user, name, current, size = "default" }: { user: string; name: string; current: Hold | null; size?: "sm" | "default" }) {
   const { staff } = useRoot();
-  const [chosen, setChosen] = useState<Hold | "" | null>(null);
-  if (!can(staff, "moderator")) return null;
-  const choices = holdChoices.filter(
-    (c) => c.state !== current && (c.state !== "" || current) && !(current === "banned" && !can(staff, "admin")),
-  );
-  const choice = holdChoices.find((c) => c.state === chosen);
+  const [chosen, setChosen] = useState<Hold | null>(null);
+  if (!can(staff, "moderator") || current === "banned") return null;
+  const choices = restrictions.filter((c) => c.state !== current);
+  const choice = restrictions.find((c) => c.state === chosen);
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size={size} disabled={!choices.length}>
-            {current ? "Change hold" : "Hold"}
+          <Button variant="outline" size={size}>
+            <ShieldIcon data-icon="inline-start" />
+            Restrict
             <ChevronDownIcon data-icon="inline-end" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuLabel>{current === "banned" && !can(staff, "admin") ? "Lifting a ban takes an admin" : name}</DropdownMenuLabel>
+          <DropdownMenuLabel>{current ? "Change the restriction" : `Restrict ${name || "this account"}`}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {choices.map((c) => (
-            <DropdownMenuItem
-              key={c.state || "lift"}
-              variant={c.state === "banned" ? "destructive" : "default"}
-              onSelect={() => setChosen(c.state)}
-            >
+            <DropdownMenuItem key={c.state} variant={c.state === "banned" ? "destructive" : "default"} onSelect={() => setChosen(c.state)}>
               <c.icon />
               {c.label}
             </DropdownMenuItem>
@@ -248,7 +252,7 @@ export function HoldMenu({ user, name, current, size = "default" }: { user: stri
       </DropdownMenu>
       {choice && (
         <ReasonDialog
-          key={choice.state || "lift"}
+          key={choice.state}
           intent="hold"
           fields={{ user, state: choice.state }}
           open={chosen !== null}
@@ -259,6 +263,54 @@ export function HoldMenu({ user, name, current, size = "default" }: { user: stri
           submit={choice.label}
         />
       )}
+    </>
+  );
+}
+
+/** Unblock: lifts whatever hold the account is under, after a confirmation. A ban takes an admin. */
+export function UnblockButton({ user, name, current, size = "default" }: { user: string; name: string; current: Hold | null; size?: "sm" | "default" }) {
+  const { staff } = useRoot();
+  if (!current || !can(staff, "moderator")) return null;
+  const text = unblockText[current];
+  if (current === "banned" && !can(staff, "admin")) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span tabIndex={0}>
+            <Button size={size} disabled>
+              <ShieldCheckIcon data-icon="inline-start" />
+              Unblock
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Lifting a ban takes an admin</TooltipContent>
+      </Tooltip>
+    );
+  }
+  return (
+    <ReasonDialog
+      intent="hold"
+      fields={{ user, state: "" }}
+      title={`${text.title}: ${name || "this account"}?`}
+      description={text.description}
+      placeholder="Why it can come back"
+      submit="Unblock"
+      trigger={
+        <Button size={size}>
+          <ShieldCheckIcon data-icon="inline-start" />
+          Unblock
+        </Button>
+      }
+    />
+  );
+}
+
+/** Both, side by side: Restrict, and Unblock when the account is held. */
+export function HoldControls(props: { user: string; name: string; current: Hold | null; size?: "sm" | "default" }) {
+  return (
+    <>
+      <RestrictMenu {...props} />
+      <UnblockButton {...props} />
     </>
   );
 }

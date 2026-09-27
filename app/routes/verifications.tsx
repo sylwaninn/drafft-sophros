@@ -1,14 +1,13 @@
-import { useNavigate, useSearchParams } from "react-router";
-import { CameraIcon, ScanFaceIcon, ShieldBanIcon, UserRoundCheckIcon, UserRoundSearchIcon } from "lucide-react";
-import { AspectRatio } from "~/components/ui/aspect-ratio";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { CameraIcon, ChevronRightIcon, ScanFaceIcon, UserRoundSearchIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "~/components/ui/item";
+import { Card } from "~/components/ui/card";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "~/components/ui/item";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { ActButton, HoldMenu, ReasonDialog } from "~/components/app/act";
-import { MediaTile, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
+import { HoldControls } from "~/components/app/act";
+import { Nothing, Page, PageHeader, PersonAvatar, PersonLink, TimeAgo } from "~/components/app/bits";
+import { SelfieCompare } from "~/components/app/selfie-compare";
 import { QueueItem, QueueMotion } from "~/components/app/motion";
 import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
@@ -78,19 +77,11 @@ export default function Verifications({ loaderData: { queue, selfies } }: Route.
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="selfies" className="mt-4">
+        <TabsContent value="selfies" className="mt-4 space-y-6">
           {queue.selfies.length === 0 ? (
             <Nothing title="No selfie to compare">When someone sends the selfie they owe, it lands here.</Nothing>
           ) : (
-            <div className="grid gap-4">
-              <QueueMotion>
-                {queue.selfies.map((s) => (
-                  <QueueItem key={s.person.id} id={s.person.id}>
-                    <SelfieCase item={s} selfie={selfies[s.person.id]?.[0] ?? null} />
-                  </QueueItem>
-                ))}
-              </QueueMotion>
-            </div>
+            <SelfieQueue queue={queue} selfies={selfies} focus={params.get("case")} />
           )}
         </TabsContent>
 
@@ -112,7 +103,7 @@ export default function Verifications({ loaderData: { queue, selfies } }: Route.
                         </ItemDescription>
                       </ItemContent>
                       <ItemActions>
-                        <HoldMenu user={r.person.id} name={r.person.name ?? ""} current="review" size="sm" />
+                        <HoldControls user={r.person.id} name={r.person.name ?? ""} current="review" size="sm" />
                       </ItemActions>
                     </Item>
                   </QueueItem>
@@ -157,86 +148,50 @@ export default function Verifications({ loaderData: { queue, selfies } }: Route.
   );
 }
 
-function SelfieCase({ item: s, selfie }: { item: Queue["selfies"][number]; selfie: string | null }) {
+/** The case in front (the oldest, or the one picked), and the ones waiting after it. */
+function SelfieQueue({ queue, selfies, focus }: { queue: Queue; selfies: Record<string, (string | null)[]>; focus: string | null }) {
   const { staff } = useRoot();
-  const moderator = can(staff, "moderator");
-  const name = s.person.name ?? "this account";
+  const index = Math.max(0, queue.selfies.findIndex((s) => s.person.id === focus));
+  const current = queue.selfies[index];
+  const rest = queue.selfies.filter((_, i) => i !== index);
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          <PersonLink person={s.person} showHold={false} />
-        </CardTitle>
-        <CardDescription>
-          {cause(s.cause)}. Selfie sent <TimeAgo value={s.selfieAt} />.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">Selfie</div>
-            <AspectRatio ratio={3 / 4} className="overflow-hidden rounded-lg bg-muted ring-2 ring-primary/20">
-              {moderator && selfie ? (
-                <img src={selfie} alt={`Verification selfie of ${name}`} referrerPolicy="no-referrer" className="size-full object-cover" />
-              ) : (
-                <div className="flex size-full items-center justify-center p-4 text-center text-xs text-muted-foreground">
-                  {moderator ? "The selfie file is missing." : "Selfies are shown to moderators."}
-                </div>
-              )}
-            </AspectRatio>
-          </div>
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">Profile photos</div>
-            <div className="grid grid-cols-3 gap-2 lg:grid-cols-4">
-              {s.photos.map((p) => (
-                <MediaTile key={p.key} mediaKey={p.key}>
-                  {p.status !== "approved" && (
-                    <Badge variant="secondary" className="absolute top-2 left-2 capitalize">
-                      {p.status}
-                    </Badge>
-                  )}
-                </MediaTile>
-              ))}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-      {moderator && (
-        <CardFooter className="flex flex-wrap justify-end gap-2 border-t">
-          <ReasonDialog
-            intent="hold"
-            fields={{ user: s.person.id, state: "banned" }}
-            destructive
-            title={`Ban ${name}?`}
-            description="The selfie isn't the person in the photos. Their email, phone and sign-ins can't come back."
-            submit="Ban"
-            trigger={
-              <Button variant="destructive">
-                <ShieldBanIcon data-icon="inline-start" />
-                Not them: ban
-              </Button>
-            }
+    <>
+      <QueueMotion>
+        <QueueItem key={current.person.id} id={current.person.id}>
+          <SelfieCompare
+            item={{ ...current, cause: cause(current.cause) }}
+            selfie={selfies[current.person.id]?.[0] ?? null}
+            position={index + 1}
+            total={queue.selfies.length}
+            canDecide={can(staff, "moderator")}
           />
-          <ReasonDialog
-            intent="hold"
-            fields={{ user: s.person.id, state: "selfie" }}
-            title="Ask for another selfie"
-            description="Their account stays frozen until they send a new one."
-            placeholder="Blurry, face hidden, not the front camera"
-            submit="Ask again"
-            trigger={
-              <Button variant="outline">
-                <CameraIcon data-icon="inline-start" />
-                Ask again
-              </Button>
-            }
-          />
-          <ActButton intent="hold" fields={{ user: s.person.id, state: "", reason: "selfie matches the photos" }}>
-            <UserRoundCheckIcon data-icon="inline-start" />
-            Same person: lift the hold
-          </ActButton>
-        </CardFooter>
+        </QueueItem>
+      </QueueMotion>
+      {rest.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground">Waiting after this one</h2>
+          <ItemGroup className="gap-2">
+            {rest.map((s) => (
+              <Item key={s.person.id} variant="outline" size="sm" asChild>
+                <Link to={`?case=${s.person.id}`} replace preventScrollReset>
+                  <ItemMedia>
+                    <PersonAvatar person={s.person} className="size-8" />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>{s.person.name || "No name yet"}</ItemTitle>
+                    <ItemDescription>
+                      Selfie sent <TimeAgo value={s.selfieAt} />
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <ChevronRightIcon className="size-4 text-muted-foreground" />
+                  </ItemActions>
+                </Link>
+              </Item>
+            ))}
+          </ItemGroup>
+        </section>
       )}
-    </Card>
+    </>
   );
 }

@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { EyeIcon, FlagIcon } from "lucide-react";
-import { Badge } from "~/components/ui/badge";
-import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { ActButton } from "~/components/app/act";
-import { MediaTile, Nothing, Page, PageHeader, Panel, PersonLink, TimeAgo } from "~/components/app/bits";
+import { MediaTile, Nothing, OverlayBadge, Page, PageHeader, Panel, PersonLink, TimeAgo } from "~/components/app/bits";
 import { QueueItem, QueueMotion } from "~/components/app/motion";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
@@ -84,37 +82,37 @@ export default function Flags({ loaderData: { flags, users } }: Route.ComponentP
           {flags.length === 0 ? (
             <Nothing icon={<FlagIcon />} title="Nothing flagged to look at" />
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
               <QueueMotion>
                 {flags.map((f) => (
-                  <QueueItem key={f.id} id={f.id}>
-                    <Card className={cn("gap-3 overflow-hidden pt-0 transition-shadow", selected.has(f.id) && "ring-2 ring-primary")}>
-                      <MediaTile mediaKey={f.key} className="rounded-none">
-                        <Badge variant={f.verdict === "rejected" ? "destructive" : "secondary"} className="absolute top-2 left-2 capitalize backdrop-blur">
-                          {f.context}
-                        </Badge>
-                        {!f.reviewed_at && (
-                          <Checkbox
-                            aria-label="Select"
-                            checked={selected.has(f.id)}
-                            onCheckedChange={(on) => toggle(f.id, on === true)}
-                            className="absolute top-2 right-2 bg-background/80 backdrop-blur"
-                          />
-                        )}
-                      </MediaTile>
-                      <CardHeader className="px-3">
-                        <CardTitle className="text-sm">
-                          <PersonLink person={f.person} />
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                          {f.labels.slice(0, 3).join(", ")}
-                          <br />
-                          <TimeAgo value={f.created_at} />
-                          {(f.userFlags30d ?? 0) > 1 && <>, {f.userFlags30d} flags in 30 days</>}
-                          {f.reviewed_at && <>, looked at by {f.reviewed_by}</>}
-                        </CardDescription>
-                      </CardHeader>
-                    </Card>
+                  <QueueItem key={f.id} id={f.id} className="space-y-3">
+                    <MediaTile
+                      mediaKey={f.key}
+                      gallery={flags.map((x) => ({ key: x.key, caption: `${x.person?.name ?? "Someone"}, ${x.context}: ${x.labels.join(", ")}` }))}
+                      index={flags.indexOf(f)}
+                      title="Flagged media"
+                      className={cn("rounded-xl transition-shadow", selected.has(f.id) && "ring-2 ring-primary")}
+                    >
+                      <OverlayBadge tone={f.verdict === "rejected" ? "danger" : "neutral"}>{f.context}</OverlayBadge>
+                      {!f.reviewed_at && (
+                        <Checkbox
+                          aria-label="Select"
+                          checked={selected.has(f.id)}
+                          onCheckedChange={(on) => toggle(f.id, on === true)}
+                          className="absolute top-2 right-2 size-5 bg-background/85 backdrop-blur-sm"
+                        />
+                      )}
+                    </MediaTile>
+                    <div className="space-y-1 px-0.5 text-sm">
+                      <PersonLink person={f.person} />
+                      <p className="text-xs text-muted-foreground">
+                        {f.labels.slice(0, 3).join(", ")}
+                        <br />
+                        <TimeAgo value={f.created_at} />
+                        {(f.userFlags30d ?? 0) > 1 && <>, {f.userFlags30d} flags in 30 days</>}
+                        {f.reviewed_at && <>, looked at by {f.reviewed_by}</>}
+                      </p>
+                    </div>
                   </QueueItem>
                 ))}
               </QueueMotion>

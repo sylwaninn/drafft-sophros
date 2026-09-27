@@ -30,8 +30,8 @@ import { Spinner } from "~/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Textarea } from "~/components/ui/textarea";
-import { ActButton, HoldMenu, ReasonDialog, useAct } from "~/components/app/act";
-import { Facts, HoldBadge, Id, MediaTile, Nothing, Page, Panel, PersonAvatar, PersonLink, TimeAgo } from "~/components/app/bits";
+import { ActButton, HoldControls, ReasonDialog, useAct } from "~/components/app/act";
+import { Facts, HoldBadge, Id, MediaTile, Nothing, OverlayBadge, Page, Panel, PersonAvatar, PersonLink, TimeAgo } from "~/components/app/bits";
 import { age } from "~/components/app/format";
 import { useMediaUrl, useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
@@ -96,7 +96,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <HoldMenu user={p.id} name={p.name} current={p.moderation} />
+          <HoldControls user={p.id} name={p.name} current={p.moderation} />
           <MoreMenu u={u} moderator={moderator} />
         </div>
       </div>
@@ -267,13 +267,17 @@ function ProfileTab({ u, moderator }: { u: UserDetail; moderator: boolean }) {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {u.media.map((m) => (
               <div key={m.id} className="space-y-2">
-                <MediaTile mediaKey={m.key} kind={m.kind} posterKey={m.posterKey}>
-                  <div className="absolute top-2 left-2 flex gap-1">
-                    <Badge variant={m.status === "rejected" ? "destructive" : "secondary"} className="capitalize backdrop-blur">
-                      {m.status}
-                    </Badge>
-                    {m.reviewRequestedAt && <Badge variant="secondary">Second look</Badge>}
-                  </div>
+                <MediaTile
+                  mediaKey={m.key}
+                  kind={m.kind}
+                  posterKey={m.posterKey}
+                  gallery={u.media.map((x, i) => ({ key: x.key, kind: x.kind, posterKey: x.posterKey, caption: `Photo ${i + 1} of ${u.media.length}, ${x.status}` }))}
+                  index={u.media.indexOf(m)}
+                  title={`${p.name || "Their"} photos`}
+                >
+                  <OverlayBadge tone={m.status === "rejected" ? "danger" : "neutral"}>
+                    {m.reviewRequestedAt ? `${m.status}, second look` : m.status}
+                  </OverlayBadge>
                 </MediaTile>
                 {moderator && (
                   <div className="flex gap-1.5">
@@ -598,10 +602,13 @@ function SafetyTab({ u }: { u: UserDetail }) {
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-6">
             {u.flags.map((f) => (
               <div key={f.id} className="space-y-1.5">
-                <MediaTile mediaKey={f.key}>
-                  <Badge variant={f.verdict === "rejected" ? "destructive" : "secondary"} className="absolute top-2 left-2 capitalize backdrop-blur">
-                    {f.context}
-                  </Badge>
+                <MediaTile
+                  mediaKey={f.key}
+                  gallery={u.flags.map((x) => ({ key: x.key, caption: `${x.context}: ${x.labels.join(", ")}` }))}
+                  index={u.flags.indexOf(f)}
+                  title="Flagged media"
+                >
+                  <OverlayBadge tone={f.verdict === "rejected" ? "danger" : "neutral"}>{f.context}</OverlayBadge>
                 </MediaTile>
                 <p className="truncate text-xs text-muted-foreground" title={f.labels.join(", ")}>
                   {f.labels[0]}

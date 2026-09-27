@@ -1,5 +1,5 @@
 // Small building blocks of sophros, each made of shadcn/ui primitives.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { CircleCheckIcon, ImageOffIcon, ScanFaceIcon, ShieldBanIcon, ShieldQuestionIcon } from "lucide-react";
 import { AspectRatio } from "~/components/ui/aspect-ratio";
@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip
 import { cn } from "~/lib/utils";
 import type { Hold, Person } from "~/lib/types";
 import { ago, formatDate } from "./format";
+import { isVideo, PhotoViewer, type ViewerMedia } from "./photo-viewer";
 import { useMediaUrl } from "./root-data";
 
 // MARK: Page
@@ -165,12 +166,18 @@ export function TimeAgo({ value, exact = false, className }: { value: string | n
   );
 }
 
-/** A photo or video from the media bucket, at 3:4 like the app shows them. */
+/**
+ * A photo or video from the media bucket, at 3:4 like the app shows them. Clicking opens it large in a
+ * dialog; with a `gallery`, ← and → then move through its other photos.
+ */
 export function MediaTile({
   mediaKey,
   kind,
   posterKey,
   ratio = 3 / 4,
+  gallery,
+  index = 0,
+  title,
   className,
   children,
 }: {
@@ -178,32 +185,64 @@ export function MediaTile({
   kind?: string;
   posterKey?: string | null;
   ratio?: number;
+  gallery?: ViewerMedia[];
+  index?: number;
+  title?: string;
   className?: string;
   children?: ReactNode;
 }) {
   const url = useMediaUrl();
-  const isVideo = kind === "video" || /\.(mp4|mov|m4v)$/i.test(mediaKey ?? "");
+  const [open, setOpen] = useState(false);
+  const video = !!mediaKey && isVideo({ key: mediaKey, kind });
   return (
-    <AspectRatio ratio={ratio} className={cn("group/media relative overflow-hidden rounded-lg bg-muted", className)}>
+    <AspectRatio ratio={ratio} className={cn("group/media relative overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10", className)}>
       {!mediaKey ? (
         <div className="flex size-full items-center justify-center text-muted-foreground">
           <ImageOffIcon className="size-5" />
         </div>
-      ) : isVideo ? (
-        <video src={url(mediaKey)} poster={url(posterKey)} controls preload="none" className="size-full object-cover" />
       ) : (
-        <a href={url(mediaKey)} target="_blank" rel="noreferrer noopener" className="block size-full">
-          <img
-            src={url(mediaKey)}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="size-full object-cover transition-transform duration-300 ease-out group-hover/media:scale-[1.03] motion-reduce:transition-none"
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="block size-full cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            aria-label="Open larger"
+          >
+            <img
+              src={url(video ? posterKey : mediaKey)}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              className="size-full object-cover transition-transform duration-300 ease-out group-hover/media:scale-[1.03] motion-reduce:transition-none"
+            />
+          </button>
+          <PhotoViewer
+            items={gallery ?? [{ key: mediaKey, kind, posterKey }]}
+            index={gallery ? index : 0}
+            open={open}
+            onOpenChange={setOpen}
+            title={title}
           />
-        </a>
+        </>
       )}
       {children}
     </AspectRatio>
+  );
+}
+
+/** A badge laid over a photo, readable on any picture. */
+export function OverlayBadge({ children, tone = "neutral", className }: { children: ReactNode; tone?: "neutral" | "danger"; className?: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "pointer-events-none absolute top-2 left-2 border-transparent bg-background/85 capitalize backdrop-blur-sm",
+        tone === "danger" && "text-destructive",
+        className,
+      )}
+    >
+      {children}
+    </Badge>
   );
 }
 
