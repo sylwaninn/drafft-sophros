@@ -4,8 +4,8 @@
 #   scripts/demo.sh up     replaces any previous demo: 14 accounts and every case sophros handles
 #   scripts/demo.sh down   removes it all
 #
-# Rows go in with triggers off (scripts/demo/up.sql): no email, push, Stream or R2 call. Pictures are drawn
-# locally (silhouettes, no real face) and uploaded to the local Storage: bucket sophros-demo for photos,
+# Rows go in with triggers off (scripts/demo/up.sql): no email, push, Stream or R2 call. Pictures are stock
+# placeholders (scripts/demo/photos.py) uploaded to the local Storage: bucket sophros-demo for photos,
 # verification-selfies for the selfie. The accounts never appear in the app's Discover.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -38,7 +38,7 @@ case "${1:-}" in
     trap 'rm -rf "$work"' EXIT
     sql < scripts/demo/up.sql > "$work/media.txt"
     echo "de000000-0000-4000-8000-000000000004/demo/selfie.jpg|selfie" >> "$work/media.txt"
-    python3 scripts/demo/images.py "$work/img" "$work/media.txt"
+    python3 scripts/demo/photos.py "$work/img" "$work/media.txt"
     storage POST bucket -H "content-type: application/json" -d '{"id":"sophros-demo","name":"sophros-demo","public":true}'
     while IFS='|' read -r path _; do
       bucket=sophros-demo
