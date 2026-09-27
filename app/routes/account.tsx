@@ -96,6 +96,15 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {moderator && u.matches.length > 0 && (
+            <Button variant="outline" asChild>
+              <Link to={`/conversations?user=${p.id}`} viewTransition>
+                <MessagesSquareIcon data-icon="inline-start" />
+                Conversations
+                <Badge variant="secondary">{u.matches.length}</Badge>
+              </Link>
+            </Button>
+          )}
           <HoldControls user={p.id} name={p.name} current={p.moderation} />
           <MoreMenu u={u} moderator={moderator} />
         </div>
@@ -115,7 +124,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
               {safetyOpen > 0 && <Badge variant="destructive">{safetyOpen}</Badge>}
             </TabsTrigger>
             <TabsTrigger value="matches">
-              Matches
+              Conversations
               <Badge variant="secondary">{u.matches.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="billing">Billing and support</TabsTrigger>

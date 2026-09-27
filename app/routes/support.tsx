@@ -1,15 +1,23 @@
-import { useState } from "react";
-import { Form, useNavigate, useSearchParams } from "react-router";
-import { CheckIcon, DownloadIcon, LifeBuoyIcon, MailIcon, RotateCcwIcon, SearchIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Form, useNavigate, useRevalidator, useSearchParams } from "react-router";
+import { CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
+import { Field, FieldDescription, FieldLabel } from "~/components/ui/field";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "~/components/ui/item";
+import { Kbd, KbdGroup } from "~/components/ui/kbd";
+import { Label } from "~/components/ui/label";
+import { ScrollArea } from "~/components/ui/scroll-area";
+import { Spinner } from "~/components/ui/spinner";
+import { Textarea } from "~/components/ui/textarea";
 import { Card } from "~/components/ui/card";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "~/components/ui/input-group";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "~/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
-import { ActButton } from "~/components/app/act";
+import { ActButton, useAct } from "~/components/app/act";
 import { Facts, Id, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
@@ -42,13 +50,17 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
     }
     navigate(`?${next}`, { replace: true, preventScrollReset: true });
   };
-  const selected = requests.find((r) => r.id === openId) ?? null;
+  // A request closed while open leaves the "Open" list; the sheet keeps showing it until dismissed.
+  const last = useRef<SupportRequest | null>(null);
+  const found = requests.find((r) => r.id === openId) ?? null;
+  if (found) last.current = found;
+  const selected = openId === null ? null : (found ?? (last.current?.id === openId ? last.current : null));
 
   return (
     <Page>
       <PageHeader
         title="Support"
-        description="Messages from the app's help forms, and data exports to send. Reply by email with the reference in the subject."
+        description="Messages from the app's help forms, and data exports to send. Open a request to reply: the email leaves from here, in their language."
         actions={
           <ToggleGroup type="single" variant="outline" size="sm" value={all ? "all" : "open"} onValueChange={(v) => v && set({ status: v === "all" ? "all" : null })}>
             <ToggleGroupItem value="open">Open</ToggleGroupItem>
@@ -107,7 +119,10 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {s.person ? <PersonLink person={s.person} /> : <span className="text-muted-foreground">{s.email}</span>}
                       </TableCell>
-                      <TableCell className="max-w-80 truncate text-muted-foreground">{s.message}</TableCell>
+                      <TableCell className="max-w-80 truncate text-muted-foreground">
+                        {s.replies.length > 0 && <Badge variant="outline" className="mr-2">{s.replies.length} repl{s.replies.length === 1 ? "y" : "ies"}</Badge>}
+                        {s.message}
+                      </TableCell>
                       <TableCell>
                         <TimeAgo value={s.created_at} />
                       </TableCell>
@@ -166,54 +181,139 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
       </Tabs>
 
       <Sheet open={!!selected} onOpenChange={(open) => !open && setOpenId(null)}>
-        <SheetContent className="sm:max-w-lg">
-          {selected && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{selected.topic}</SheetTitle>
-                <SheetDescription>
-                  <Id value={selected.reference} />, received <TimeAgo value={selected.created_at} exact />
-                </SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-6 overflow-y-auto px-4">
-                <Facts
-                  rows={[
-                    ["From", selected.person ? <PersonLink key="p" person={selected.person} /> : "Signed out"],
-                    ["Email", selected.email],
-                    ["Language", <Badge key="l" variant="secondary" className="uppercase">{selected.language}</Badge>],
-                    ...Object.entries(selected.context ?? {}).map(
-                      ([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)] as [string, string],
-                    ),
-                  ]}
-                />
-                <blockquote className="border-l-2 pl-4 text-sm whitespace-pre-wrap">{selected.message}</blockquote>
-                {selected.handled_at && (
-                  <p className="text-sm text-muted-foreground">
-                    Handled by {selected.handled_by}, <TimeAgo value={selected.handled_at} />.
-                  </p>
-                )}
-              </div>
-              <SheetFooter className="flex-row">
-                <Button variant="outline" className="flex-1" asChild>
-                  <a href={`mailto:${selected.email}?subject=${encodeURIComponent(`[${selected.reference}] ${selected.topic}`)}`}>
-                    <MailIcon data-icon="inline-start" />
-                    Reply by email
-                  </a>
-                </Button>
-                <ActButton
-                  intent="support"
-                  fields={{ id: selected.id, handled: selected.handled_at ? "false" : "true" }}
-                  variant={selected.handled_at ? "outline" : "default"}
-                  className="flex-1"
-                >
-                  {selected.handled_at ? <RotateCcwIcon data-icon="inline-start" /> : <CheckIcon data-icon="inline-start" />}
-                  {selected.handled_at ? "Reopen" : "Mark handled"}
-                </ActButton>
-              </SheetFooter>
-            </>
-          )}
+        <SheetContent className="gap-0 sm:max-w-xl">
+          {selected && <Thread request={selected} />}
         </SheetContent>
       </Sheet>
     </Page>
+  );
+}
+
+/** A request, the team's replies under it, and the reply box: sent by email from the backend. */
+function Thread({ request: r }: { request: SupportRequest }) {
+  const form = useRef<HTMLFormElement>(null);
+  const [close, setClose] = useState(true);
+  const { fetcher, pending } = useAct({ onDone: () => form.current?.reset() });
+  // A reply is emailed by the backend a moment later: check back until it's sent.
+  const revalidator = useRevalidator();
+  const sending = r.replies.some((m) => !m.sentAt && !m.error);
+  useEffect(() => {
+    if (!sending) return;
+    const t = setInterval(() => revalidator.state === "idle" && revalidator.revalidate(), 3000);
+    return () => clearInterval(t);
+  }, [sending, revalidator]);
+  return (
+    <>
+      <SheetHeader className="border-b">
+        <SheetTitle>{r.topic}</SheetTitle>
+        <SheetDescription>
+          <Id value={r.reference} />, {r.email}, <span className="uppercase">{r.language}</span>
+        </SheetDescription>
+      </SheetHeader>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="space-y-6 p-4">
+          <Facts
+            rows={[
+              ["From", r.person ? <PersonLink key="p" person={r.person} /> : "Signed out"],
+              ["Received", <TimeAgo key="t" value={r.created_at} exact />],
+              ...Object.entries(r.context ?? {}).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)] as [string, string]),
+              ["Status", r.handled_at ? `Handled by ${r.handled_by}` : "Open"],
+            ]}
+          />
+          <ItemGroup className="gap-3">
+            <Item variant="muted" className="items-start">
+              <ItemContent>
+                <ItemDescription>
+                  {r.person?.name || r.email}, <TimeAgo value={r.created_at} />
+                </ItemDescription>
+                <ItemTitle className="font-normal whitespace-pre-wrap">{r.message}</ItemTitle>
+              </ItemContent>
+            </Item>
+            {r.replies.map((m) => (
+              <Item key={m.id} variant="outline" className="ml-8 items-start">
+                <ItemContent>
+                  <ItemDescription className="flex flex-wrap items-center gap-1.5">
+                    {m.author}, <TimeAgo value={m.createdAt} />
+                    {m.error ? (
+                      <Badge variant="destructive">Not sent, retrying</Badge>
+                    ) : m.sentAt ? (
+                      <Badge variant="secondary">
+                        <MailCheckIcon data-icon="inline-start" />
+                        Sent
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">
+                        <Spinner data-icon="inline-start" />
+                        Sending
+                      </Badge>
+                    )}
+                  </ItemDescription>
+                  <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
+                </ItemContent>
+              </Item>
+            ))}
+          </ItemGroup>
+        </div>
+      </ScrollArea>
+      <SheetFooter className="border-t">
+        <fetcher.Form ref={form} method="post" action="/act" className="grid gap-3">
+          <input type="hidden" name="intent" value="support-reply" />
+          <input type="hidden" name="id" value={r.id} />
+          <input type="hidden" name="close" value={String(close)} />
+          <Field>
+            <FieldLabel htmlFor="reply" className="sr-only">
+              Reply
+            </FieldLabel>
+            <Textarea
+              id="reply"
+              name="body"
+              required
+              rows={4}
+              maxLength={8000}
+              placeholder={`Reply to ${r.person?.name || r.email}, in their language (${r.language.toUpperCase()})`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  form.current?.requestSubmit();
+                }
+              }}
+            />
+            <FieldDescription>
+              Emailed to {r.email} with the reference, framed in their language. Their answer reaches the support inbox.
+            </FieldDescription>
+          </Field>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox id="close" checked={close} onCheckedChange={(v) => setClose(v === true)} />
+              <Label htmlFor="close" className="font-normal">
+                Close the request
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              {r.handled_at && (
+                <ActButton intent="support" fields={{ id: r.id, handled: "false" }} variant="ghost" size="sm">
+                  <RotateCcwIcon data-icon="inline-start" />
+                  Reopen
+                </ActButton>
+              )}
+              {!r.handled_at && (
+                <ActButton intent="support" fields={{ id: r.id, handled: "true" }} variant="ghost" size="sm">
+                  <CheckIcon data-icon="inline-start" />
+                  Close without replying
+                </ActButton>
+              )}
+              <Button type="submit" disabled={pending}>
+                {pending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
+                Send
+                <KbdGroup className="ml-1">
+                  <Kbd>⌘</Kbd>
+                  <Kbd>↵</Kbd>
+                </KbdGroup>
+              </Button>
+            </div>
+          </div>
+        </fetcher.Form>
+      </SheetFooter>
+    </>
   );
 }

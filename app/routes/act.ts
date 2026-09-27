@@ -16,6 +16,7 @@ const errors: Record<string, string> = {
   not_found: "It's gone, or already handled.",
   own_role: "You can't change your own role.",
   invalid_role: "Unknown role.",
+  empty_reply: "Write the reply first.",
 };
 
 const holds = new Set<unknown>(["review", "selfie", "banned"]);
@@ -64,6 +65,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       case "support":
         await rpc(staff, "admin_set_support_handled", { p_id: Number(text("id")), p_handled: text("handled") === "true" });
         return result({ ok: true });
+      case "support-reply":
+        await rpc(staff, "admin_reply_support", { p_id: Number(text("id")), p_body: text("body"), p_close: text("close") === "true" });
+        return result({ ok: true, message: text("close") === "true" ? "Reply sent, request closed." : "Reply sent." });
       case "data-request":
         await rpc(staff, "admin_fulfil_data_request", { p_id: Number(text("id")) });
         return result({ ok: true });

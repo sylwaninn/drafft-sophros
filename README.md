@@ -47,10 +47,10 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
 | Account | profile and photos, email and phone, sign-in methods, sessions (IP, client), devices (model, iOS, app version, locale, time zone, IP, country, opens, last opened), IPs, approximate location, usage, holds and their history, reports, blocks, flagged media, related accounts (same install, IP or marked identity), matches, wallet and purchases, support, notes, staff trail; hold, sign out everywhere, approve or refuse photos |
 | Verifications | selfie next to the profile photos (lift, ask again, ban), accounts in review with their cause, selfies still owed |
 | Reports | open reports with both people, the count of reporters, their conversation; close with a resolution and an optional hold |
-| Support | help-form messages (reply by email with the reference), data exports to send |
+| Support | help-form messages with their thread; replies are written here and emailed by the backend in the person's language; data exports to send |
 | Photo reviews | profile media the automatic check left pending: second looks first |
 | Flagged media | chat and profile photos flagged silently; mark looked at in bulk; most flagged accounts |
-| Conversations | every match; a conversation opens with a reason; delete a message |
+| Conversations | every match, filtered by person, name or email, status, a report between them, flagged chat photos, sessions; a conversation opens with a reason; delete a message |
 | Audit log, Staff | admins |
 
 ## Local development
