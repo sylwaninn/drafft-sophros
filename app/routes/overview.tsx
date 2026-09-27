@@ -3,7 +3,7 @@ import { ChevronRightIcon, DownloadIcon, ScanFaceIcon, ShieldBanIcon, ShieldQues
 import { Badge } from "~/components/ui/badge";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "~/components/ui/item";
 import { Page, PageHeader, Panel } from "~/components/app/bits";
-import { ago } from "~/components/app/format";
+import { ago, formatTime } from "~/components/app/format";
 import { nav } from "~/components/app/nav";
 import { useRoot, type QueueCount } from "~/components/app/root-data";
 import { can } from "~/lib/roles";
@@ -53,7 +53,7 @@ function QueueRow({ q, count }: { q: (typeof queues)[number]; count: QueueCount 
 }
 
 export default function Overview() {
-  const { queues: counts, holds, staff } = useRoot();
+  const { queues: counts, holds, staff, countedAt } = useRoot();
   const visible = queues.filter((q) => q.key !== "flags" || can(staff, "moderator"));
   const open = visible.filter((q) => counts[q.key].count > 0 && q.key !== "selfieOwed");
   const oldestFirst = [...visible].sort((a, b) => {
@@ -69,6 +69,11 @@ export default function Overview() {
           open.length
             ? "Every queue, the one waiting longest first. Each case needs a person; each decision takes a reason."
             : "Nothing waits for a person right now."
+        }
+        actions={
+          <span className="text-sm text-muted-foreground tabular-nums">
+            Counted at <time dateTime={countedAt}>{formatTime(countedAt)}</time>
+          </span>
         }
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
