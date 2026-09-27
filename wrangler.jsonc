@@ -39,10 +39,10 @@
 				"AUTH_MODE": "access",
 				"SUPABASE_URL": "https://rjlghcuspdtrmbimyioe.supabase.co",
 				"MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
-				// Zero Trust > Settings > Custom Pages: https://<team>.cloudflareaccess.com
-				"ACCESS_TEAM_DOMAIN": "",
-				// Zero Trust > Access > Applications > sophros staging > Application Audience (AUD) Tag
-				"ACCESS_AUD": "",
+				// Zero Trust team domain (Settings > Team name and domain)
+				"ACCESS_TEAM_DOMAIN": "https://drafft-sophros.cloudflareaccess.com",
+				// Access application "sophros staging" > Application Audience (AUD) Tag
+				"ACCESS_AUD": "e64e4a91d758037a35c70d74cb716fb69c39498f605605c98d754388e5bf30f6",
 				"DEMO_MEDIA_URL": ""
 			}
 		},
@@ -54,7 +54,8 @@
 				"AUTH_MODE": "access",
 				"SUPABASE_URL": "https://wrcpgnqwjmnirjfxpcux.supabase.co",
 				"MEDIA_PUBLIC_URL": "https://pub-f4b77604ea6f42188c3ba8da914a6a16.r2.dev",
-				"ACCESS_TEAM_DOMAIN": "",
+				"ACCESS_TEAM_DOMAIN": "https://drafft-sophros.cloudflareaccess.com",
+				// Access application "sophros" (production) > Application Audience (AUD) Tag
 				"ACCESS_AUD": "",
 				"DEMO_MEDIA_URL": ""
 			}
