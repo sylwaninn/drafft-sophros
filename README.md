@@ -70,6 +70,11 @@ key and secret in `.dev.vars`. The local database is the one the app's **Drafft 
 actions here really happen there (holds reach the app live, a lifted hold deletes the selfies and emails
 the person).
 
+Demo data, local database only: `scripts/demo.sh up` adds 14 accounts covering every case (a ban and a
+new account on the same iPhone, a selfie to compare, reports, flagged chat photos, support requests),
+`scripts/demo.sh down` removes them. They go in with triggers off (no email, push, Stream or R2 call) and
+never show in the app's Discover. Their pictures are drawn silhouettes in the local Storage.
+
 Checks: `pnpm typecheck && pnpm test && pnpm build`.
 
 ## Deploying

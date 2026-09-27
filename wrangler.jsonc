@@ -25,6 +25,8 @@
 		"AUTH_MODE": "dev",
 		"SUPABASE_URL": "http://127.0.0.1:55421",
 		"MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
+		// Demo pictures (scripts/demo.sh), in the local Storage. Ignored outside local.
+		"DEMO_MEDIA_URL": "http://127.0.0.1:55421/storage/v1/object/public/sophros-demo",
 		"ACCESS_TEAM_DOMAIN": "",
 		"ACCESS_AUD": ""
 	},
@@ -40,7 +42,8 @@
 				// Zero Trust > Settings > Custom Pages: https://<team>.cloudflareaccess.com
 				"ACCESS_TEAM_DOMAIN": "",
 				// Zero Trust > Access > Applications > sophros staging > Application Audience (AUD) Tag
-				"ACCESS_AUD": ""
+				"ACCESS_AUD": "",
+				"DEMO_MEDIA_URL": ""
 			}
 		},
 		"production": {
@@ -52,7 +55,8 @@
 				"SUPABASE_URL": "https://wrcpgnqwjmnirjfxpcux.supabase.co",
 				"MEDIA_PUBLIC_URL": "https://pub-f4b77604ea6f42188c3ba8da914a6a16.r2.dev",
 				"ACCESS_TEAM_DOMAIN": "",
-				"ACCESS_AUD": ""
+				"ACCESS_AUD": "",
+				"DEMO_MEDIA_URL": ""
 			}
 		}
 	}

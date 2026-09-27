@@ -8,6 +8,8 @@ export interface Config {
   supabaseUrl: string;
   supabaseKey: string;
   mediaUrl: string;
+  /** Local only: where demo media (keys with a `/demo/` folder) are served from (scripts/demo.sh). */
+  demoMediaUrl: string | null;
   stream: { key: string; secret: string } | null;
 }
 
@@ -51,6 +53,7 @@ export function loadConfig(vars: Record<string, string | undefined>): Config {
     supabaseUrl,
     supabaseKey: required("SUPABASE_SECRET_KEY"),
     mediaUrl: required("MEDIA_PUBLIC_URL").replace(/\/+$/, ""),
+    demoMediaUrl: drafftEnv === "local" ? (value("DEMO_MEDIA_URL")?.replace(/\/+$/, "") ?? null) : null,
     stream: streamKey && streamSecret ? { key: streamKey, secret: streamSecret } : null,
   };
 }

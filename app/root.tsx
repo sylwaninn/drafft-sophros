@@ -33,6 +33,7 @@ export async function loader({ context }: Route.LoaderArgs) {
     staff,
     env: config.env,
     mediaUrl: config.mediaUrl,
+    demoMediaUrl: config.demoMediaUrl,
     counts: {
       verifications: o.holds.review ?? 0,
       selfies: o.selfiesToCheck,

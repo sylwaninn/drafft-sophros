@@ -7,6 +7,7 @@ export interface RootData {
   staff: Staff;
   env: "local" | "staging" | "production";
   mediaUrl: string;
+  demoMediaUrl: string | null;
   counts: Record<string, number>;
 }
 
@@ -17,8 +18,9 @@ export function useRoot(): RootData {
 }
 
 export function useMediaUrl() {
-  const { mediaUrl } = useRoot();
-  return (key: string | null | undefined) => (key ? `${mediaUrl}/${key}` : null);
+  const { mediaUrl, demoMediaUrl } = useRoot();
+  return (key: string | null | undefined) =>
+    key ? `${demoMediaUrl && key.includes("/demo/") ? demoMediaUrl : mediaUrl}/${key}` : null;
 }
 
 export function cx(...names: (string | false | null | undefined)[]) {
