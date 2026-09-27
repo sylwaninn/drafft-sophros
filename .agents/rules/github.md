@@ -8,6 +8,10 @@
 
 ## Pull Requests
 
+- Feature pull requests target `staging` (the default branch); only `staging` opens pull requests into `main`
+- **NEVER** merge a pull request whose checks are red or still running, and never with admin rights to
+  bypass them
+
 - **MANDATORY**: Always use the `/create-pr` skill when creating pull requests
 - **NEVER** create PRs manually with `gh pr create` - the skill ensures the correct template is used
 - Keep PR titles under 70 characters

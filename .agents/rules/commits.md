@@ -24,6 +24,21 @@ test(auth): add login service tests
 style(components): apply consistent spacing
 ```
 
+## Protected Branches (ABSOLUTE)
+
+`staging` deploys staging and `main` deploys production. They only change through pull requests:
+
+- **NEVER** push to `main` or `staging`, in any form (`git push origin main`, `HEAD:staging`, `+main`,
+  `--force`, `--all`, `--mirror`, or a plain `git push` while on one of them)
+- **NEVER** commit on `main` or `staging`: create a branch first (`git switch -c feat/<name>`)
+- **NEVER** merge into them locally; merges happen on GitHub, once CI is green
+- **NEVER** use `--no-verify` (commit or push), and never disable or edit the hooks to get past them
+- Flow: feature branch → pull request into `staging` → pull request from `staging` into `main`
+
+Enforced by the git hooks in `.agents/git-hooks/` (`pre-commit`, `commit-msg`, `pre-push`, enabled by
+`pnpm install`) and, for Claude Code, by `.claude/hooks/guard-git.py`. If a hook refuses, change the
+approach; don't work around it.
+
 ## Branch Naming
 
 | Prefix    | Usage               |
@@ -50,5 +65,5 @@ style(components): apply consistent spacing
 
 - One logical change per commit
 - Atomic commits that build independently
-- No WIP commits on main branch
+- No WIP commits, and no commits at all on `main` or `staging`
 - Never commit sensitive data (.env, credentials)

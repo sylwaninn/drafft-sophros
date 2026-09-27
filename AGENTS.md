@@ -12,12 +12,15 @@ React Router and Workers APIs move fast: read `node_modules/react-router/docs/` 
 
 - Commits and branches: [.agents/rules/commits.md](.agents/rules/commits.md) (scope `sophros`)
 - GitHub: [.agents/rules/github.md](.agents/rules/github.md)
-- Git hooks, once per clone: `git config core.hooksPath .agents/git-hooks`
+- Git hooks (`.agents/git-hooks/`: `pre-commit`, `commit-msg`, `pre-push`), enabled by `pnpm install`
+  (`prepare` script; or by hand: `git config core.hooksPath .agents/git-hooks`)
+- Claude Code: `.claude/hooks/guard-git.py` blocks pushes to `staging`/`main` and `--no-verify`
 
 Verify before committing: `pnpm verify` (types, ESLint, Prettier, tests, build), as CI does.
 
 Branches: feature branch → pull request into `staging` (deploys staging) → pull request from `staging`
-into `main` (deploys production). Nobody pushes to `staging` or `main` directly; the pre-push hook refuses.
+into `main` (deploys production). **Never push or commit to `staging` or `main`, never use `--no-verify`**:
+the hooks refuse it, and a refusal means changing the approach, not getting around it.
 
 ## Safety
 
