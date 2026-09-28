@@ -22,7 +22,7 @@ export default function Audit({ loaderData: { rows, more, page } }: Route.Compon
     <Page>
       <PageHeader
         title="Audit log"
-        description="Everything the staff did or opened, newest first. It can't be edited or deleted, by anyone."
+        description="Everything the staff did or opened, newest first. The database refuses any change, deletion or emptying of it from sophros or the app."
       />
       {rows.length === 0 ? (
         <Nothing title="Nothing yet" />
