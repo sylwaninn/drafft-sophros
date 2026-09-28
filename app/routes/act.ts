@@ -45,8 +45,8 @@ export async function action({ request, context }: Route.ActionArgs) {
         return result({ ok: true, message: state ? "Hold set." : "Hold lifted." });
       }
       case "revoke-sessions": {
-        const count = await rpc<number>(staff, "admin_revoke_sessions", { p_user: text("user"), p_reason: text("reason") });
-        return result({ ok: true, message: `${count} session${count === 1 ? "" : "s"} revoked.` });
+        await rpc<number>(staff, "admin_revoke_sessions", { p_user: text("user"), p_reason: text("reason") });
+        return result({ ok: true, message: "Signed out everywhere." });
       }
       case "note":
         if (!text("body")) return result({ ok: false, error: "Write something first." });
