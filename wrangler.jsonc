@@ -9,6 +9,8 @@
  *   wrangler secret put SUPABASE_SECRET_KEY --env <env>
  *   wrangler secret put STREAM_API_KEY --env <env>
  *   wrangler secret put STREAM_API_SECRET --env <env>
+ *   wrangler secret put MEDIA_SIGNING_KEY --env <env>   the backend's, same environment (private media)
+ * MEDIA_PUBLIC_URL moves to the media Worker's domain (media-staging / media.getdrafft.com) once it's live.
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
