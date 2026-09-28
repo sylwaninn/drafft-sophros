@@ -1,5 +1,6 @@
 // Every change posts to /act through a fetcher; the result comes back as a toast, and React Router
-// reloads what's on screen (resolved items then leave their queue).
+// reloads what's on screen (resolved items then leave their queue), refusals included: a refusal often
+// means someone else changed it first.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
@@ -81,7 +82,7 @@ export function ActButton({
 }: { intent: string; fields?: Fields; children: ReactNode } & Omit<React.ComponentProps<typeof Button>, "type" | "form">) {
   const { fetcher, pending } = useAct();
   return (
-    <fetcher.Form method="post" action="/act" className="contents">
+    <fetcher.Form method="post" action="/act" defaultShouldRevalidate className="contents">
       <Hidden intent={intent} fields={fields} />
       <Button type="submit" disabled={pending || button.disabled} {...button}>
         {pending && <Spinner data-icon="inline-start" />}
@@ -134,7 +135,7 @@ export function ReasonDialog({
   const { fetcher, pending } = useAct({ onDone: () => setOpen(false) });
 
   const form = (
-    <fetcher.Form method="post" action="/act" className="grid gap-6">
+    <fetcher.Form method="post" action="/act" defaultShouldRevalidate className="grid gap-6">
       <Hidden intent={intent} fields={fields} />
       <FieldGroup>
         {children}

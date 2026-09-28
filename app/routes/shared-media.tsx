@@ -36,7 +36,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 const why = (f: Flag) => `photo shared in a chat: ${f.labels.join(", ")}`;
-const resolve = (f: Flag, reason: string) => ({ intent: "flags" as const, ids: [f.id], reason });
 const holdable = (f: Flag) => !!f.person && !f.person.deleted && f.person.moderation !== "banned";
 
 const actions: ReviewAction<Flag>[] = [
@@ -47,7 +46,7 @@ const actions: ReviewAction<Flag>[] = [
     icon: CheckIcon,
     variant: "default",
     done: "Marked as fine.",
-    ops: (f) => [resolve(f, "nothing wrong")],
+    decide: (f) => ({ intent: "flags", ids: [f.id], reason: "nothing wrong" }),
   },
   {
     id: "review",
@@ -57,7 +56,7 @@ const actions: ReviewAction<Flag>[] = [
     available: holdable,
     reason: why,
     done: "Account held for review.",
-    ops: (f, reason) => [{ intent: "hold", user: f.person!.id, state: "review", reason }, resolve(f, "account held for review")],
+    decide: (f, reason) => ({ intent: "flags", ids: [f.id], reason: "account held for review", hold: "review", holdReason: reason }),
   },
   {
     id: "selfie",
@@ -67,7 +66,7 @@ const actions: ReviewAction<Flag>[] = [
     available: holdable,
     reason: why,
     done: "Selfie asked: the account is frozen until they send it.",
-    ops: (f, reason) => [{ intent: "hold", user: f.person!.id, state: "selfie", reason }, resolve(f, "selfie asked")],
+    decide: (f, reason) => ({ intent: "flags", ids: [f.id], reason: "selfie asked", hold: "selfie", holdReason: reason }),
   },
   {
     id: "ban",
@@ -82,7 +81,7 @@ const actions: ReviewAction<Flag>[] = [
       destructive: true,
     },
     done: "Account banned.",
-    ops: (f, reason) => [{ intent: "hold", user: f.person!.id, state: "banned", reason }, resolve(f, "account banned")],
+    decide: (f, reason) => ({ intent: "flags", ids: [f.id], reason: "account banned", hold: "banned", holdReason: reason }),
   },
 ];
 
