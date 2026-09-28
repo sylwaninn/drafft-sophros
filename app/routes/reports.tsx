@@ -105,7 +105,8 @@ export default function Reports({ loaderData: { reports } }: Route.ComponentProp
           </Table>
         </Card>
       )}
-      <ReportSheet report={selected} onClose={() => setOpenId(null)} />
+      {/* Keyed by report: the hold chosen for one report never carries over to the next. */}
+      <ReportSheet key={selected?.id ?? "none"} report={selected} onClose={() => setOpenId(null)} />
     </Page>
   );
 }
@@ -115,6 +116,7 @@ function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: (
   const [hold, setHold] = useState("none");
   const [reading, setReading] = useState<string | null>(null);
   const moderator = can(staff, "moderator");
+  const ban = hold === "banned";
   return (
     <>
       <ConversationDrawer matchId={reading} from={r ? `report ${r.id.slice(0, 8)}` : "report"} onClose={() => setReading(null)} />
@@ -157,33 +159,42 @@ function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: (
                 )}
               </div>
               {!r.handledAt && moderator && r.reported && (
-                <SheetFooter>
+                <SheetFooter className="gap-3">
+                  <Field>
+                    <FieldLabel htmlFor="report-hold">Hold on {r.reported.name ?? "the account"}</FieldLabel>
+                    <Select value={hold} onValueChange={setHold}>
+                      <SelectTrigger id="report-hold" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No hold</SelectItem>
+                        <SelectItem value="review">Hold for review</SelectItem>
+                        <SelectItem value="selfie">Ask for a selfie</SelectItem>
+                        <SelectItem value="banned">Ban</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
                   <ReasonDialog
+                    key={ban ? "ban" : "close"}
                     intent="report"
                     fields={{ report: r.id, user: r.reported.id, hold: hold === "none" ? "" : hold }}
                     reasonName="resolution"
                     label="Resolution"
                     placeholder="What you found and did"
-                    title="Close the report"
-                    description="The resolution goes to the audit log; the hold, if any, applies at once."
-                    submit={hold === "banned" ? "Ban and close" : "Close the report"}
-                    trigger={<Button className="w-full">Close the report</Button>}
-                  >
-                    <Field>
-                      <FieldLabel>Hold on {r.reported.name ?? "the account"}</FieldLabel>
-                      <Select value={hold} onValueChange={setHold}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No hold</SelectItem>
-                          <SelectItem value="review">Hold for review</SelectItem>
-                          <SelectItem value="selfie">Ask for a selfie</SelectItem>
-                          <SelectItem value="banned">Ban</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                  </ReasonDialog>
+                    destructive={ban}
+                    title={ban ? `Ban ${r.reported.name ?? "this account"} and close the report` : "Close the report"}
+                    description={
+                      ban
+                        ? "The ban applies at once: the account closes for good, and its email, phone and sign-ins can't come back. The resolution goes to the audit log."
+                        : "The resolution goes to the audit log; the hold, if any, applies at once."
+                    }
+                    submit={ban ? "Ban and close" : "Close the report"}
+                    trigger={
+                      <Button className="w-full" variant={ban ? "destructive" : "default"}>
+                        {ban ? "Ban and close" : "Close the report"}
+                      </Button>
+                    }
+                  />
                 </SheetFooter>
               )}
             </>
