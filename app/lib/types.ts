@@ -196,7 +196,10 @@ export interface UserDetail {
   marks: { kind: string; state: Hold; createdAt: string }[];
   selfies: { id: number; createdAt: string }[];
   stats: Record<string, number>;
-  matches: { id: string; createdAt: string; endedAt: string | null; endedBy: string | null; other: Person }[];
+  /** Moderators and admins only: support gets `hidden.matches` instead. */
+  matches?: { id: string; createdAt: string; endedAt: string | null; endedBy: string | null; other: Person }[];
+  /** For support: how many chat photo flags and matches the account has, without them. */
+  hidden?: { chatFlags: number; matches: number };
   blocksGiven: { person: Person; createdAt: string }[];
   blocksReceived: { person: Person; createdAt: string }[];
   reportsReceived: (Report & { reporter: Person | null })[];

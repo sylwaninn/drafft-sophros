@@ -92,6 +92,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
   const safetyOpen = u.reportsReceived.filter((r) => !r.handledAt).length + u.flags.filter((f) => !f.reviewed_at).length;
   const years = age(p.birthdate);
   const premium = typeof u.wallet?.premium_until === "string" && new Date(u.wallet.premium_until) > new Date();
+  const matchCount = u.hidden?.matches ?? u.matches?.length ?? 0;
 
   return (
     <Page>
@@ -113,12 +114,12 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {moderator && u.matches.length > 0 && (
+          {moderator && matchCount > 0 && (
             <Button variant="outline" asChild>
               <Link to={`/conversations?user=${p.id}`} viewTransition>
                 <MessagesSquareIcon data-icon="inline-start" />
                 Conversations
-                <Badge variant="secondary">{u.matches.length}</Badge>
+                <Badge variant="secondary">{matchCount}</Badge>
               </Link>
             </Button>
           )}
@@ -142,7 +143,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
             </TabsTrigger>
             <TabsTrigger value="matches">
               Conversations
-              <Badge variant="secondary">{u.matches.length}</Badge>
+              <Badge variant="secondary">{matchCount}</Badge>
             </TabsTrigger>
             <TabsTrigger value="billing">Billing and support</TabsTrigger>
             <TabsTrigger value="notes">
@@ -632,9 +633,16 @@ function SafetyTab({ u }: { u: UserDetail }) {
           <People items={u.blocksGiven} empty="Blocked nobody" />
         </Section>
       </div>
-      <Section title="Flagged media" count={u.flags.length}>
+      <Section title="Flagged media" count={u.flags.length + (u.hidden?.chatFlags ?? 0)}>
+        {u.hidden?.chatFlags ? (
+          <p className="mb-4 text-sm text-muted-foreground">
+            {u.hidden.chatFlags} flagged chat photo{u.hidden.chatFlags === 1 ? "" : "s"} not shown: chat photos are for moderators.
+          </p>
+        ) : null}
         {u.flags.length === 0 ? (
-          <Nothing title="Nothing flagged" />
+          u.hidden?.chatFlags ? null : (
+            <Nothing title="Nothing flagged" />
+          )
         ) : (
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-6">
             {u.flags.map((f) => (
@@ -681,7 +689,15 @@ function People({ items, empty }: { items: UserDetail["blocksGiven"]; empty: str
 
 function MatchesTab({ u, moderator }: { u: UserDetail; moderator: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
-  if (u.matches.length === 0) return <Nothing icon={<MessagesSquareIcon />} title="No match yet" />;
+  const matches = u.matches ?? [];
+  if (u.hidden?.matches) {
+    return (
+      <Nothing icon={<MessagesSquareIcon />} title={`${u.hidden.matches} match${u.hidden.matches === 1 ? "" : "es"}`}>
+        Who they matched with is for moderators: your role sees how many.
+      </Nothing>
+    );
+  }
+  if (matches.length === 0) return <Nothing icon={<MessagesSquareIcon />} title="No match yet" />;
   return (
     <Card className="py-0">
       <ConversationDrawer matchId={open} from={`account ${u.profile.name || u.profile.id}`} onClose={() => setOpen(null)} />
@@ -695,7 +711,7 @@ function MatchesTab({ u, moderator }: { u: UserDetail; moderator: boolean }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {u.matches.map((m) => (
+          {matches.map((m) => (
             <TableRow key={m.id}>
               <TableCell className="pl-4">
                 <PersonLink person={m.other} />
