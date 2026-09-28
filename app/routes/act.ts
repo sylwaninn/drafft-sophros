@@ -23,7 +23,15 @@ const holds = new Set<unknown>(["review", "selfie", "banned"]);
 
 export async function action({ request, context }: Route.ActionArgs) {
   const staff = context.get(staffContext);
-  const form = await request.formData();
+  // Changes come as a posted form, and only as that.
+  if (request.method !== "POST")
+    return data({ ok: false, error: "Changes are posted." } satisfies ActResult, { status: 405, headers: { allow: "POST" } });
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return result({ ok: false, error: "That wasn't a form." }, 400);
+  }
   const text = (name: string) => String(form.get(name) ?? "").trim();
   const intent = text("intent");
 

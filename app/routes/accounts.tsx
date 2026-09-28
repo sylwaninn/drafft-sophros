@@ -10,6 +10,7 @@ import { HoldBadge, Nothing, Page, PageHeader, PersonAvatar, TimeAgo } from "~/c
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import type { UserRow } from "~/lib/types";
+import { pageParam } from "~/lib/paging";
 import type { Route } from "./+types/accounts";
 
 const pageSize = 50;
@@ -27,7 +28,7 @@ const filters = [
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
-  const page = Math.max(0, Number(url.searchParams.get("page")) || 0);
+  const page = pageParam(url.searchParams.get("page"));
   const rows = await query<UserRow[]>(context.get(staffContext), "admin_users", {
     p_query: url.searchParams.get("q") ?? "",
     p_filter: url.searchParams.get("filter") ?? "all",

@@ -6,12 +6,13 @@ import { Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import type { AuditEntry } from "~/lib/types";
+import { pageParam } from "~/lib/paging";
 import type { Route } from "./+types/audit";
 
 const pageSize = 100;
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const page = Math.max(0, Number(new URL(request.url).searchParams.get("page")) || 0);
+  const page = pageParam(new URL(request.url).searchParams.get("page"));
   const rows = await query<AuditEntry[]>(context.get(staffContext), "admin_audit", { p_limit: pageSize + 1, p_offset: page * pageSize });
   return { rows: rows.slice(0, pageSize), more: rows.length > pageSize, page };
 }
