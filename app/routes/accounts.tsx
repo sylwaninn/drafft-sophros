@@ -6,7 +6,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "~/components/ui/in
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "~/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
-import { HoldBadge, Nothing, Page, PageHeader, PersonAvatar, TimeAgo } from "~/components/app/bits";
+import { DeletedBadge, HoldBadge, Nothing, Page, PageHeader, PersonAvatar, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import type { UserRow } from "~/lib/types";
@@ -20,6 +20,7 @@ const filters = [
   ["review", "Review"],
   ["selfie", "Selfie"],
   ["banned", "Banned"],
+  ["deleted", "Deleted"],
   ["flagged", "Flagged"],
   ["reported", "Reported"],
   ["premium", "tempo"],
@@ -113,8 +114,9 @@ export default function Accounts({ loaderData: { rows, more, page } }: Route.Com
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
+                      <DeletedBadge at={u.deleted_at} />
                       <HoldBadge hold={u.moderation} />
-                      {u.paused && !u.moderation && <Badge variant="secondary">Paused</Badge>}
+                      {u.paused && !u.moderation && !u.deleted_at && <Badge variant="secondary">Paused</Badge>}
                       {!u.onboarded_at && <Badge variant="outline">Onboarding</Badge>}
                       {u.premium && <Badge variant="outline">tempo</Badge>}
                     </div>

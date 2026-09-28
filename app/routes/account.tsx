@@ -32,8 +32,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Textarea } from "~/components/ui/textarea";
 import { ActButton, HoldControls, ReasonDialog, useAct } from "~/components/app/act";
 import {
+  DeletedBadge,
   Facts,
   HoldBadge,
+  holdLabel,
   Id,
   MediaTile,
   Nothing,
@@ -45,23 +47,25 @@ import {
   TimeAgo,
 } from "~/components/app/bits";
 import { ConversationDrawer } from "~/components/app/conversation-drawer";
-import { age } from "~/components/app/format";
+import { age, formatDate } from "~/components/app/format";
 import { useMediaUrl, useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
 import { revalidateOnNewRead } from "~/lib/audited-reads";
-import type { AuditEntry, UserDetail } from "~/lib/types";
+import type { AccountDeletion, AuditEntry, UserDetail } from "~/lib/types";
 import { reasons } from "./reports";
 import type { Route } from "./+types/account";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const staff = context.get(staffContext);
-  const [user, audit] = await Promise.all([
+  const [user, audit, deletion] = await Promise.all([
     query<UserDetail>(staff, "admin_user", { p_user: params.id }),
     can(staff, "moderator") ? query<AuditEntry[]>(staff, "admin_audit", { p_user: params.id, p_limit: 50 }) : Promise.resolve(null),
+    // Null unless the owner deleted the account and it was kept (reported, held or banned).
+    query<AccountDeletion | null>(staff, "admin_account_deletion", { p_user: params.id }),
   ]);
-  return { user, audit };
+  return { user, audit, deletion };
 }
 
 // Another tab shows the same account: it isn't read (nor logged as opened) again.
@@ -73,6 +77,52 @@ export function meta({ loaderData }: Route.MetaArgs) {
   return [{ title: `${loaderData?.user.profile.name || "Account"} | sophros` }];
 }
 
+function relatedVia(r: UserDetail["related"][number]) {
+  switch (r.via) {
+    case "install":
+      return "Same iPhone install";
+    case "ip":
+      return `Same IP ${r.detail}`;
+    case "previous account":
+      return `Deleted account with the same ${r.detail}, signed up again`;
+    case "later account":
+      return `Signed up again with the same ${r.detail}`;
+    default:
+      return `Same ${r.detail}`;
+  }
+}
+
+const deletionBasis: Record<AccountDeletion["basis"], string> = {
+  ban: "Banned",
+  hold: "Held for review",
+  report: "Reported",
+};
+
+// The owner deleted the account, but it was reported, held or banned: kept, hidden from everyone and signed out.
+function DeletionPanel({ deletion: d }: { deletion: AccountDeletion }) {
+  const open = d.reports.filter((r) => !r.handledAt).length;
+  return (
+    <Panel title="Deleted by the person" description={`On ${formatDate(d.deletedAt)}. Kept for members' safety.`}>
+      <Facts
+        rows={[
+          ["Kept because", deletionBasis[d.basis]],
+          ["Hold then", d.moderation ? holdLabel(d.moderation) : null],
+          [
+            "Reports",
+            d.reports.length > 0
+              ? `${d.reports.length} (${open} open): ${[...new Set(d.reports.map((r) => reasons[r.reason] ?? r.reason))].join(", ")}`
+              : null,
+          ],
+          ["Past holds", d.holds.length > 0 ? d.holds.map((h) => holdLabel(h.state)).join(", ") : null],
+          ["Legal basis", "Members' safety"],
+          ["Email then", d.identities.email ?? null],
+          ["Phone then", d.identities.phone ? `+${d.identities.phone}` : null],
+        ]}
+      />
+    </Panel>
+  );
+}
+
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
     <Panel title={title} action={count !== undefined ? <Badge variant="secondary">{count}</Badge> : undefined}>
@@ -81,7 +131,7 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   );
 }
 
-export default function Account({ loaderData: { user: u, audit } }: Route.ComponentProps) {
+export default function Account({ loaderData: { user: u, audit, deletion } }: Route.ComponentProps) {
   const { staff } = useRoot();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -105,8 +155,9 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
               {years !== null && <span className="text-xl font-normal text-muted-foreground">{years}</span>}
             </h1>
             <div className="flex flex-wrap items-center gap-1.5">
+              <DeletedBadge at={p.deleted_at} />
               <HoldBadge hold={p.moderation} />
-              {p.paused && !p.moderation && <Badge variant="secondary">Paused</Badge>}
+              {p.paused && !p.moderation && !p.deleted_at && <Badge variant="secondary">Paused</Badge>}
               {!p.onboarded_at && <Badge variant="outline">Onboarding</Badge>}
               {premium && <Badge variant="outline">tempo</Badge>}
               <Id value={p.id} />
@@ -172,6 +223,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
         </Tabs>
 
         <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">
+          {deletion && <DeletionPanel deletion={deletion} />}
           <Panel title="Identity">
             <Facts
               rows={[
@@ -202,7 +254,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
             />
           </Panel>
           {u.related.length > 0 && (
-            <Panel title="Looks related" description="Same iPhone install, IP or identity">
+            <Panel title="Looks related" description="Same iPhone install, IP or identity, or a new account after a deletion">
               <ItemGroup className="gap-1">
                 {u.related.map((r, i) => (
                   <Item key={i} size="sm" className="px-0">
@@ -211,7 +263,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
                         <PersonLink person={r.person} />
                       </ItemTitle>
                       <ItemDescription>
-                        {r.via === "install" ? "Same iPhone install" : r.via === "ip" ? `Same IP ${r.detail}` : `Same ${r.detail}`}
+                        {relatedVia(r)}
                         {r.at && (
                           <>
                             , <TimeAgo value={r.at} />
