@@ -63,8 +63,9 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Ro
   };
 }
 
-// The counters are read again after every change, on the way to "/", and once they are a minute old;
-// not on each click between pages.
+// The counters are read again after every change, on an explicit re-read of the same page (the live
+// queues socket, useLiveQueues), on the way to "/", and once they are a minute old; not on each click
+// between pages.
 export const shouldRevalidate: (args: ShouldRevalidateFunctionArgs) => boolean = rootRevalidation();
 
 export function meta({ loaderData }: Route.MetaArgs) {
