@@ -44,6 +44,8 @@ export default async function handleRequest(
   const plain = [config.supabaseUrl, config.demoMediaUrl, config.mediaUrl]
     .filter((u): u is string => !!u && u.startsWith("http:"))
     .map((u) => new URL(u).origin);
+  const page = new URL(request.url);
+  const liveOrigin = `${page.protocol === "https:" ? "wss:" : "ws:"}//${page.host}`;
   const media = ["'self'", "data:", "blob:", "https:", ...new Set(plain)].join(" ");
   responseHeaders.set("Content-Type", "text/html");
   responseHeaders.set(
@@ -55,7 +57,8 @@ export default async function handleRequest(
       "style-src 'self' 'unsafe-inline'",
       `img-src ${media}`,
       `media-src ${media}`,
-      `connect-src 'self'${dev ? " ws: wss:" : ""}`,
+      // 'self' plus its WebSocket form: the live queues socket (/live).
+      `connect-src 'self' ${liveOrigin}${dev ? " ws: wss:" : ""}`,
       "font-src 'self'",
       "object-src 'none'",
       "base-uri 'none'",

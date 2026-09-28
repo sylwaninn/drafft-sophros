@@ -4,7 +4,9 @@ export default [
   route("act", "routes/act.ts"),
   route("search", "routes/search.ts"),
   route("theme", "routes/theme.ts"),
+  route("letter-shortcuts", "routes/letter-shortcuts.ts"),
   route("conversation-data/:id", "routes/conversation-data.ts"),
+  route("media/*", "routes/media.ts"),
   layout("routes/shell.tsx", [
     layout("routes/pane.tsx", [
       index("routes/overview.tsx"),
@@ -17,6 +19,7 @@ export default [
       route("support", "routes/support.tsx"),
       route("conversations", "routes/conversations.tsx"),
       route("audit", "routes/audit.tsx"),
+      route("failed-events", "routes/failed-events.tsx"),
       route("staff", "routes/staff.tsx"),
     ]),
   ]),

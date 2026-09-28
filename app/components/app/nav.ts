@@ -6,6 +6,7 @@ import {
   LifeBuoyIcon,
   MessagesSquareIcon,
   ScanFaceIcon,
+  ServerCrashIcon,
   ShieldAlertIcon,
   SquareUserRoundIcon,
   UserCogIcon,
@@ -58,6 +59,7 @@ export const nav: NavItem[] = [
     count: (q) => q.exports.count,
   },
   { to: "/audit", label: "Audit log", icon: FileClockIcon, group: "Admin", role: "admin" },
+  { to: "/failed-events", label: "Failed events", icon: ServerCrashIcon, group: "Admin", role: "admin" },
   { to: "/staff", label: "Staff", icon: UserCogIcon, group: "Admin", role: "admin" },
 ];
 

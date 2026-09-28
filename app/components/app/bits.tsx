@@ -1,7 +1,7 @@
 // Small building blocks of sophros, each made of shadcn/ui primitives.
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { CircleCheckIcon, ImageOffIcon, ScanFaceIcon, ShieldBanIcon, ShieldQuestionIcon } from "lucide-react";
+import { CircleCheckIcon, ImageOffIcon, ScanFaceIcon, ShieldBanIcon, ShieldQuestionIcon, Trash2Icon } from "lucide-react";
 import { AspectRatio } from "~/components/ui/aspect-ratio";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
@@ -87,6 +87,17 @@ const holds: Record<Hold, { label: string; icon: typeof ShieldBanIcon; className
 
 export const holdLabel = (hold: Hold) => holds[hold].label;
 
+/** Deleted by its owner, kept for members' safety. */
+export function DeletedBadge({ at, className }: { at: string | null | undefined; className?: string }) {
+  if (!at) return null;
+  return (
+    <Badge variant="outline" className={cn("text-muted-foreground", className)}>
+      <Trash2Icon data-icon="inline-start" />
+      Deleted
+    </Badge>
+  );
+}
+
 export function HoldBadge({ hold, className }: { hold: Hold | null | undefined; className?: string }) {
   if (!hold) return null;
   const { label, icon: Icon, className: tone } = holds[hold];
@@ -148,12 +159,14 @@ export function PersonLink({
             <div className="min-w-0 space-y-1">
               <div className="truncate font-medium">{person.name || "No name yet"}</div>
               <HoldBadge hold={person.moderation} />
+              <DeletedBadge at={person.deletedAt} />
               <div className="truncate font-mono text-xs text-muted-foreground">{person.id.slice(0, 8)}</div>
             </div>
           </div>
         </HoverCardContent>
       </HoverCard>
       {showHold && <HoldBadge hold={person.moderation} />}
+      {showHold && <DeletedBadge at={person.deletedAt} />}
     </span>
   );
 }

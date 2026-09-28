@@ -15,8 +15,12 @@ export interface RootData {
   demoMediaUrl: string | null;
   theme: Theme;
   sidebarOpen: boolean;
+  /** Whether single-letter shortcuts decide in the review queues. */
+  letterShortcuts: boolean;
   holds: Record<"review" | "selfie" | "banned", number>;
   queues: Record<"selfies" | "reviews" | "selfieOwed" | "reports" | "support" | "exports" | "photos" | "flags", QueueCount>;
+  /** When the server read `holds` and `queues`. */
+  countedAt: string;
 }
 
 export function useRoot(): RootData {
@@ -25,9 +29,12 @@ export function useRoot(): RootData {
   return data;
 }
 
-/** A media key's public URL (demo keys from the local Storage). */
+/**
+ * A media key's link in sophros: `/media/<key>`, which redirects to a freshly signed URL (the bucket is
+ * private). Demo keys come straight from the local Storage.
+ */
 export function useMediaUrl() {
-  const { mediaUrl, demoMediaUrl } = useRoot();
+  const { demoMediaUrl } = useRoot();
   return (key: string | null | undefined) =>
-    key ? `${demoMediaUrl && key.includes("/demo/") ? demoMediaUrl : mediaUrl}/${key}` : undefined;
+    key ? (demoMediaUrl && key.includes("/demo/") ? `${demoMediaUrl}/${key}` : `/media/${key}`) : undefined;
 }

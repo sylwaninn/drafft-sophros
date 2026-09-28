@@ -8,7 +8,6 @@ import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
 import type { Person } from "~/lib/types";
-import type { BatchOp } from "./act";
 import type { Route } from "./+types/profile-photos";
 
 interface ProfilePhoto {
@@ -35,14 +34,6 @@ const labels = (m: ProfilePhoto) => (m.labels?.length ? m.labels.join(", ") : "n
 const pending = (m: ProfilePhoto) => m.state === "pending";
 const refused = (m: ProfilePhoto) => m.state === "refused";
 const holdable = (m: ProfilePhoto) => m.person.moderation !== "banned";
-/** A pending photo is refused with the account decision; an already refused one only has its flags closed. */
-const settle = (m: ProfilePhoto, reason: string): BatchOp[] =>
-  pending(m)
-    ? [{ intent: "media", media: m.id, approved: false, reason }]
-    : m.flagIds.length
-      ? [{ intent: "flags", ids: m.flagIds, reason }]
-      : [];
-
 const actions: ReviewAction<ProfilePhoto>[] = [
   {
     id: "approve",
@@ -52,7 +43,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     variant: "default",
     available: pending,
     done: "Photo approved: it's on their profile.",
-    ops: (m) => [{ intent: "media", media: m.id, approved: true }],
+    decide: (m) => ({ intent: "media", media: m.id, approved: true }),
   },
   {
     id: "refuse",
@@ -61,7 +52,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     icon: XIcon,
     available: pending,
     done: "Photo refused: they can ask for a second look.",
-    ops: (m) => [{ intent: "media", media: m.id, approved: false }],
+    decide: (m) => ({ intent: "media", media: m.id, approved: false }),
   },
   {
     id: "keep",
@@ -71,7 +62,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     variant: "default",
     available: refused,
     done: "Refusal confirmed.",
-    ops: (m) => [{ intent: "flags", ids: m.flagIds, reason: "refusal confirmed" }],
+    decide: (m) => ({ intent: "flags", ids: m.flagIds, reason: "refusal confirmed" }),
   },
   {
     id: "restore",
@@ -80,7 +71,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     icon: UndoIcon,
     available: refused,
     done: "Photo restored: it's on their profile.",
-    ops: (m) => [{ intent: "media", media: m.id, approved: true, reason: "the automatic refusal was wrong" }],
+    decide: (m) => ({ intent: "media", media: m.id, approved: true, reason: "the automatic refusal was wrong" }),
   },
   {
     id: "hold",
@@ -90,7 +81,8 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     available: holdable,
     reason: (m) => `profile photo refused: ${labels(m)}`,
     done: "Photo refused, account held for review.",
-    ops: (m, reason) => [...settle(m, reason), { intent: "hold", user: m.person.id, state: "review", reason }],
+    // A pending photo is refused with the account decision; an already refused one has its flags closed.
+    decide: (m, reason) => ({ intent: "photo", media: m.id, reason, hold: "review" }),
   },
   {
     id: "ban",
@@ -105,7 +97,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
       destructive: true,
     },
     done: "Photo refused, account banned.",
-    ops: (m, reason) => [...settle(m, reason), { intent: "hold", user: m.person.id, state: "banned", reason }],
+    decide: (m, reason) => ({ intent: "photo", media: m.id, reason, hold: "banned" }),
   },
 ];
 

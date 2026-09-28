@@ -32,8 +32,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Textarea } from "~/components/ui/textarea";
 import { ActButton, HoldControls, ReasonDialog, useAct } from "~/components/app/act";
 import {
+  DeletedBadge,
   Facts,
   HoldBadge,
+  holdLabel,
   Id,
   MediaTile,
   Nothing,
@@ -45,28 +47,80 @@ import {
   TimeAgo,
 } from "~/components/app/bits";
 import { ConversationDrawer } from "~/components/app/conversation-drawer";
-import { age } from "~/components/app/format";
+import { age, formatDate } from "~/components/app/format";
 import { useMediaUrl, useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
-import type { AuditEntry, UserDetail } from "~/lib/types";
+import { revalidateOnNewRead } from "~/lib/audited-reads";
+import type { AccountDeletion, AuditEntry, UserDetail } from "~/lib/types";
 import { reasons } from "./reports";
 import type { Route } from "./+types/account";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const staff = context.get(staffContext);
-  const [user, audit] = await Promise.all([
+  const [user, audit, deletion] = await Promise.all([
     query<UserDetail>(staff, "admin_user", { p_user: params.id }),
     can(staff, "moderator") ? query<AuditEntry[]>(staff, "admin_audit", { p_user: params.id, p_limit: 50 }) : Promise.resolve(null),
+    // Null unless the owner deleted the account and it was kept (reported, held or banned).
+    query<AccountDeletion | null>(staff, "admin_account_deletion", { p_user: params.id }),
   ]);
-  return { user, audit };
+  return { user, audit, deletion };
 }
+
+// Another tab shows the same account: it isn't read (nor logged as opened) again.
+export const shouldRevalidate = revalidateOnNewRead(() => "");
 
 export const handle = { crumb: (data: unknown) => (data as { user?: UserDetail } | undefined)?.user?.profile.name || "Account" };
 
 export function meta({ loaderData }: Route.MetaArgs) {
   return [{ title: `${loaderData?.user.profile.name || "Account"} | sophros` }];
+}
+
+function relatedVia(r: UserDetail["related"][number]) {
+  switch (r.via) {
+    case "install":
+      return "Same iPhone install";
+    case "ip":
+      return `Same IP ${r.detail}`;
+    case "previous account":
+      return `Deleted account with the same ${r.detail}, signed up again`;
+    case "later account":
+      return `Signed up again with the same ${r.detail}`;
+    default:
+      return `Same ${r.detail}`;
+  }
+}
+
+const deletionBasis: Record<AccountDeletion["basis"], string> = {
+  ban: "Banned",
+  hold: "Held for review",
+  report: "Reported",
+};
+
+// The owner deleted the account, but it was reported, held or banned: kept, hidden from everyone and signed out.
+function DeletionPanel({ deletion: d }: { deletion: AccountDeletion }) {
+  const open = d.reports.filter((r) => !r.handledAt).length;
+  return (
+    <Panel title="Deleted by the person" description={`On ${formatDate(d.deletedAt)}. Kept for members' safety.`}>
+      <Facts
+        rows={[
+          ["Kept because", deletionBasis[d.basis]],
+          ["Hold then", d.moderation ? holdLabel(d.moderation) : null],
+          [
+            "Reports",
+            d.reports.length > 0
+              ? `${d.reports.length} (${open} open): ${[...new Set(d.reports.map((r) => reasons[r.reason] ?? r.reason))].join(", ")}`
+              : null,
+          ],
+          ["Past holds", d.holds.length > 0 ? d.holds.map((h) => holdLabel(h.state)).join(", ") : null],
+          ["Legal basis", "Members' safety"],
+          ["Email then", d.identities.email ?? null],
+          ["Phone then", d.identities.phone ? `+${d.identities.phone}` : null],
+        ]}
+      />
+    </Panel>
+  );
 }
 
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
@@ -77,7 +131,7 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   );
 }
 
-export default function Account({ loaderData: { user: u, audit } }: Route.ComponentProps) {
+export default function Account({ loaderData: { user: u, audit, deletion } }: Route.ComponentProps) {
   const { staff } = useRoot();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -88,6 +142,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
   const safetyOpen = u.reportsReceived.filter((r) => !r.handledAt).length + u.flags.filter((f) => !f.reviewed_at).length;
   const years = age(p.birthdate);
   const premium = typeof u.wallet?.premium_until === "string" && new Date(u.wallet.premium_until) > new Date();
+  const matchCount = u.hidden?.matches ?? u.matches?.length ?? 0;
 
   return (
     <Page>
@@ -100,8 +155,9 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
               {years !== null && <span className="text-xl font-normal text-muted-foreground">{years}</span>}
             </h1>
             <div className="flex flex-wrap items-center gap-1.5">
+              <DeletedBadge at={p.deleted_at} />
               <HoldBadge hold={p.moderation} />
-              {p.paused && !p.moderation && <Badge variant="secondary">Paused</Badge>}
+              {p.paused && !p.moderation && !p.deleted_at && <Badge variant="secondary">Paused</Badge>}
               {!p.onboarded_at && <Badge variant="outline">Onboarding</Badge>}
               {premium && <Badge variant="outline">tempo</Badge>}
               <Id value={p.id} />
@@ -109,12 +165,12 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {moderator && u.matches.length > 0 && (
+          {moderator && matchCount > 0 && (
             <Button variant="outline" asChild>
               <Link to={`/conversations?user=${p.id}`} viewTransition>
                 <MessagesSquareIcon data-icon="inline-start" />
                 Conversations
-                <Badge variant="secondary">{u.matches.length}</Badge>
+                <Badge variant="secondary">{matchCount}</Badge>
               </Link>
             </Button>
           )}
@@ -138,7 +194,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
             </TabsTrigger>
             <TabsTrigger value="matches">
               Conversations
-              <Badge variant="secondary">{u.matches.length}</Badge>
+              <Badge variant="secondary">{matchCount}</Badge>
             </TabsTrigger>
             <TabsTrigger value="billing">Billing and support</TabsTrigger>
             <TabsTrigger value="notes">
@@ -167,6 +223,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
         </Tabs>
 
         <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">
+          {deletion && <DeletionPanel deletion={deletion} />}
           <Panel title="Identity">
             <Facts
               rows={[
@@ -197,7 +254,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
             />
           </Panel>
           {u.related.length > 0 && (
-            <Panel title="Looks related" description="Same iPhone install, IP or identity">
+            <Panel title="Looks related" description="Same iPhone install, IP or identity, or a new account after a deletion">
               <ItemGroup className="gap-1">
                 {u.related.map((r, i) => (
                   <Item key={i} size="sm" className="px-0">
@@ -206,7 +263,7 @@ export default function Account({ loaderData: { user: u, audit } }: Route.Compon
                         <PersonLink person={r.person} />
                       </ItemTitle>
                       <ItemDescription>
-                        {r.via === "install" ? "Same iPhone install" : r.via === "ip" ? `Same IP ${r.detail}` : `Same ${r.detail}`}
+                        {relatedVia(r)}
                         {r.at && (
                           <>
                             , <TimeAgo value={r.at} />
@@ -267,7 +324,7 @@ function MoreMenu({ u, moderator }: { u: UserDetail; moderator: boolean }) {
           intent="revoke-sessions"
           fields={{ user: u.profile.id }}
           title="Sign out everywhere"
-          description={`Ends ${u.sessions.length} open session${u.sessions.length === 1 ? "" : "s"}. The app asks them to sign in again within the hour.`}
+          description={`Ends ${u.sessions.length} open session${u.sessions.length === 1 ? "" : "s"}. They'll be signed out at once.`}
           submit="Sign out everywhere"
           open={revoking}
           onOpenChange={setRevoking}
@@ -628,9 +685,16 @@ function SafetyTab({ u }: { u: UserDetail }) {
           <People items={u.blocksGiven} empty="Blocked nobody" />
         </Section>
       </div>
-      <Section title="Flagged media" count={u.flags.length}>
+      <Section title="Flagged media" count={u.flags.length + (u.hidden?.chatFlags ?? 0)}>
+        {u.hidden?.chatFlags ? (
+          <p className="mb-4 text-sm text-muted-foreground">
+            {u.hidden.chatFlags} flagged chat photo{u.hidden.chatFlags === 1 ? "" : "s"} not shown: chat photos are for moderators.
+          </p>
+        ) : null}
         {u.flags.length === 0 ? (
-          <Nothing title="Nothing flagged" />
+          u.hidden?.chatFlags ? null : (
+            <Nothing title="Nothing flagged" />
+          )
         ) : (
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-6">
             {u.flags.map((f) => (
@@ -677,7 +741,15 @@ function People({ items, empty }: { items: UserDetail["blocksGiven"]; empty: str
 
 function MatchesTab({ u, moderator }: { u: UserDetail; moderator: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
-  if (u.matches.length === 0) return <Nothing icon={<MessagesSquareIcon />} title="No match yet" />;
+  const matches = u.matches ?? [];
+  if (u.hidden?.matches) {
+    return (
+      <Nothing icon={<MessagesSquareIcon />} title={`${u.hidden.matches} match${u.hidden.matches === 1 ? "" : "es"}`}>
+        Who they matched with is for moderators: your role sees how many.
+      </Nothing>
+    );
+  }
+  if (matches.length === 0) return <Nothing icon={<MessagesSquareIcon />} title="No match yet" />;
   return (
     <Card className="py-0">
       <ConversationDrawer matchId={open} from={`account ${u.profile.name || u.profile.id}`} onClose={() => setOpen(null)} />
@@ -691,7 +763,7 @@ function MatchesTab({ u, moderator }: { u: UserDetail; moderator: boolean }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {u.matches.map((m) => (
+          {matches.map((m) => (
             <TableRow key={m.id}>
               <TableCell className="pl-4">
                 <PersonLink person={m.other} />

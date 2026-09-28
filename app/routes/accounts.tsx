@@ -6,10 +6,11 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "~/components/ui/in
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "~/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
-import { HoldBadge, Nothing, Page, PageHeader, PersonAvatar, TimeAgo } from "~/components/app/bits";
+import { DeletedBadge, HoldBadge, Nothing, Page, PageHeader, PersonAvatar, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import type { UserRow } from "~/lib/types";
+import { pageParam } from "~/lib/paging";
 import type { Route } from "./+types/accounts";
 
 const pageSize = 50;
@@ -19,6 +20,7 @@ const filters = [
   ["review", "Review"],
   ["selfie", "Selfie"],
   ["banned", "Banned"],
+  ["deleted", "Deleted"],
   ["flagged", "Flagged"],
   ["reported", "Reported"],
   ["premium", "tempo"],
@@ -27,7 +29,7 @@ const filters = [
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
-  const page = Math.max(0, Number(url.searchParams.get("page")) || 0);
+  const page = pageParam(url.searchParams.get("page"));
   const rows = await query<UserRow[]>(context.get(staffContext), "admin_users", {
     p_query: url.searchParams.get("q") ?? "",
     p_filter: url.searchParams.get("filter") ?? "all",
@@ -101,12 +103,7 @@ export default function Accounts({ loaderData: { rows, more, page } }: Route.Com
               {rows.map((u) => (
                 <TableRow key={u.id} className="group/row">
                   <TableCell className="pl-4">
-                    <Link
-                      to={`/accounts/${u.id}`}
-                      viewTransition
-                      prefetch="intent"
-                      className="flex items-center gap-2 font-medium group-hover/row:underline"
-                    >
+                    <Link to={`/accounts/${u.id}`} viewTransition className="flex items-center gap-2 font-medium group-hover/row:underline">
                       <PersonAvatar person={u} className="size-7" />
                       {u.name || <span className="text-muted-foreground">No name yet</span>}
                     </Link>
@@ -117,8 +114,9 @@ export default function Accounts({ loaderData: { rows, more, page } }: Route.Com
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
+                      <DeletedBadge at={u.deleted_at} />
                       <HoldBadge hold={u.moderation} />
-                      {u.paused && !u.moderation && <Badge variant="secondary">Paused</Badge>}
+                      {u.paused && !u.moderation && !u.deleted_at && <Badge variant="secondary">Paused</Badge>}
                       {!u.onboarded_at && <Badge variant="outline">Onboarding</Badge>}
                       {u.premium && <Badge variant="outline">tempo</Badge>}
                     </div>

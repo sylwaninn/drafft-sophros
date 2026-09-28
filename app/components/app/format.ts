@@ -1,5 +1,11 @@
 const dateTime = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Paris" });
 
+const time = new Intl.DateTimeFormat("en-GB", { timeStyle: "short", timeZone: "Europe/Paris" });
+
+export function formatTime(value: string) {
+  return time.format(new Date(value));
+}
+
 export function formatDate(value: string | null | undefined) {
   return value ? dateTime.format(new Date(value)) : "";
 }

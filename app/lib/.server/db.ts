@@ -41,9 +41,9 @@ export async function call<T>(fn: string, args: Record<string, unknown> = {}): P
   return (text ? JSON.parse(text) : null) as T;
 }
 
-/** An admin function, as this staff member. */
+/** An admin function, as this staff member: the actor always comes last, so no argument can replace it. */
 export function rpc<T>(staff: Staff, fn: `admin_${string}`, args: Record<string, unknown> = {}): Promise<T> {
-  return call<T>(fn, { p_actor: staff.email, ...args });
+  return call<T>(fn, { ...args, p_actor: staff.email });
 }
 
 /**

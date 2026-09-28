@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { Form, useNavigate, useRevalidator, useSearchParams } from "react-router";
-import { CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Form, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
+import { ArrowRightIcon, CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -39,8 +39,12 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [openId, setOpenId] = useState<number | null>(null);
-  // A request closed while open leaves the "Open" list; the sheet keeps showing it until dismissed.
+  // A request closed while open leaves the "Open" list; the sheet keeps showing it until dismissed,
+  // read on its own (by reference, any status) so the reply just sent and the new status show. The
+  // fetcher is revalidated with the page, after each change and while a reply is being emailed.
   const [snapshot, setSnapshot] = useState<SupportRequest | null>(null);
+  const detached = useFetcher<typeof loader>();
+  const detachedFor = useRef<number | null>(null);
   const open = (r: SupportRequest) => {
     setSnapshot(r);
     setOpenId(r.id);
@@ -56,7 +60,15 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
     }
     navigate(`?${next}`, { replace: true, preventScrollReset: true });
   };
-  const selected = openId === null ? null : (requests.find((r) => r.id === openId) ?? (snapshot?.id === openId ? snapshot : null));
+  const listed = openId === null ? undefined : requests.find((r) => r.id === openId);
+  const detachedCopy = openId === null ? undefined : detached.data?.requests.find((r) => r.id === openId);
+  const selected = openId === null ? null : (listed ?? detachedCopy ?? (snapshot?.id === openId ? snapshot : null));
+  const reference = openId !== null && !listed && snapshot?.id === openId ? snapshot.reference : null;
+  useEffect(() => {
+    if (openId === null || reference === null || detachedFor.current === openId) return;
+    detachedFor.current = openId;
+    detached.load(`/support?${new URLSearchParams({ status: "all", q: reference })}`);
+  }, [openId, reference, detached]);
 
   return (
     <Page>
@@ -118,7 +130,8 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
                     <TableHead>From</TableHead>
                     <TableHead>Message</TableHead>
                     <TableHead>Received</TableHead>
-                    <TableHead className="pr-4 text-right">Status</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="pr-4 text-right" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -140,8 +153,14 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
                       <TableCell>
                         <TimeAgo value={s.created_at} />
                       </TableCell>
+                      <TableCell>{s.handled_at ? <Badge variant="outline">Handled</Badge> : <Badge>Open</Badge>}</TableCell>
                       <TableCell className="pr-4 text-right">
-                        {s.handled_at ? <Badge variant="outline">Handled</Badge> : <Badge>Open</Badge>}
+                        {/* The row opens on a click; this is its keyboard way in. */}
+                        <Button variant="ghost" size="sm" onClick={() => open(s)}>
+                          Open
+                          <span className="sr-only">request {s.reference}</span>
+                          <ArrowRightIcon data-icon="inline-end" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -204,8 +223,22 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
 /** A request, the team's replies under it, and the reply box: sent by email from the backend. */
 function Thread({ request: r }: { request: SupportRequest }) {
   const form = useRef<HTMLFormElement>(null);
+  const formId = useId();
   const [close, setClose] = useState(true);
-  const { fetcher, pending } = useAct({ onDone: () => form.current?.reset() });
+  // One key per reply, made in the browser when the reply box is first used (never during server
+  // rendering) and dropped once it's sent: sending the same reply twice (a double press, a retried
+  // request) is one message and one email (admin_reply_support). Another request, another key.
+  const [replyKey, setReplyKey] = useState<{ request: number; key: string } | null>(null);
+  const key = replyKey?.request === r.id ? replyKey.key : "";
+  const ensureKey = () => {
+    if (!key) setReplyKey({ request: r.id, key: crypto.randomUUID() });
+  };
+  const { fetcher, pending } = useAct({
+    onDone: () => {
+      form.current?.reset();
+      setReplyKey(null);
+    },
+  });
   // A reply is emailed by the backend a moment later: check back until it's sent.
   const revalidator = useRevalidator();
   const sending = r.replies.some((m) => !m.sentAt && !m.error);
@@ -267,11 +300,12 @@ function Thread({ request: r }: { request: SupportRequest }) {
           </ItemGroup>
         </div>
       </ScrollArea>
-      <SheetFooter className="border-t">
-        <fetcher.Form ref={form} method="post" action="/act" className="grid gap-3">
+      <SheetFooter className="gap-3 border-t">
+        <fetcher.Form ref={form} id={formId} method="post" action="/act" className="grid gap-3">
           <input type="hidden" name="intent" value="support-reply" />
           <input type="hidden" name="id" value={r.id} />
           <input type="hidden" name="close" value={String(close)} />
+          <input type="hidden" name="key" value={key} />
           <Field>
             <FieldLabel htmlFor="reply" className="sr-only">
               Reply
@@ -283,10 +317,13 @@ function Thread({ request: r }: { request: SupportRequest }) {
               rows={4}
               maxLength={8000}
               placeholder={`Reply to ${r.person?.name || r.email}, in their language (${r.language.toUpperCase()})`}
+              onFocus={ensureKey}
+              onChange={ensureKey}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
-                  form.current?.requestSubmit();
+                  // One reply per press: not while one is on its way, nor on a held-down key.
+                  if (!pending && !e.repeat) form.current?.requestSubmit();
                 }
               }}
             />
@@ -294,37 +331,38 @@ function Thread({ request: r }: { request: SupportRequest }) {
               Emailed to {r.email} with the reference, framed in their language. Their answer reaches the support inbox.
             </FieldDescription>
           </Field>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Checkbox id="close" checked={close} onCheckedChange={(v) => setClose(v === true)} />
-              <Label htmlFor="close" className="font-normal">
-                Close the request
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              {r.handled_at && (
-                <ActButton intent="support" fields={{ id: r.id, handled: "false" }} variant="ghost" size="sm">
-                  <RotateCcwIcon data-icon="inline-start" />
-                  Reopen
-                </ActButton>
-              )}
-              {!r.handled_at && (
-                <ActButton intent="support" fields={{ id: r.id, handled: "true" }} variant="ghost" size="sm">
-                  <CheckIcon data-icon="inline-start" />
-                  Close without replying
-                </ActButton>
-              )}
-              <Button type="submit" disabled={pending}>
-                {pending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
-                Send
-                <KbdGroup className="ml-1">
-                  <Kbd>⌘</Kbd>
-                  <Kbd>↵</Kbd>
-                </KbdGroup>
-              </Button>
-            </div>
-          </div>
         </fetcher.Form>
+        {/* Outside the reply form: each of these buttons is a form of its own. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Checkbox id="close" checked={close} onCheckedChange={(v) => setClose(v === true)} />
+            <Label htmlFor="close" className="font-normal">
+              Close the request
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            {r.handled_at && (
+              <ActButton intent="support" fields={{ id: r.id, handled: "false" }} variant="ghost" size="sm">
+                <RotateCcwIcon data-icon="inline-start" />
+                Reopen
+              </ActButton>
+            )}
+            {!r.handled_at && (
+              <ActButton intent="support" fields={{ id: r.id, handled: "true" }} variant="ghost" size="sm">
+                <CheckIcon data-icon="inline-start" />
+                Close without replying
+              </ActButton>
+            )}
+            <Button type="submit" form={formId} disabled={pending}>
+              {pending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
+              Send
+              <KbdGroup className="ml-1">
+                <Kbd>⌘</Kbd>
+                <Kbd>↵</Kbd>
+              </KbdGroup>
+            </Button>
+          </div>
+        </div>
       </SheetFooter>
     </>
   );

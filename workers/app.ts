@@ -1,4 +1,8 @@
 import { createRequestHandler } from "react-router";
+import { identify } from "~/lib/.server/auth";
+import { handleLive } from "./live-relay";
+
+export { LiveQueues } from "./live";
 
 const requestHandler = createRequestHandler(() => import("virtual:react-router/server-build"), import.meta.env.MODE);
 
@@ -14,8 +18,13 @@ const securityHeaders: Record<string, string> = {
 };
 
 export default {
-  async fetch(request) {
-    const response = await requestHandler(request);
+  async fetch(request, env) {
+    // The live queues socket: the same Access and staff check as every page, then the one shared object.
+    const response =
+      new URL(request.url).pathname === "/live"
+        ? await handleLive(request, identify, env.LIVE.getByName("staff"))
+        : await requestHandler(request);
+    if (response.status === 101) return response;
     const headers = new Headers(response.headers);
     for (const [name, value] of Object.entries(securityHeaders)) headers.set(name, value);
     if (!headers.has("Cache-Control")) headers.set("Cache-Control", "private, no-store");

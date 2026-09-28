@@ -9,6 +9,8 @@
  *   wrangler secret put SUPABASE_SECRET_KEY --env <env>
  *   wrangler secret put STREAM_API_KEY --env <env>
  *   wrangler secret put STREAM_API_SECRET --env <env>
+ *   wrangler secret put MEDIA_SIGNING_KEY --env <env>   the backend's, same environment (private media)
+ * MEDIA_PUBLIC_URL: every environment uses the media Worker (media-staging / media.getdrafft.com), which serves the private buckets through signed links.
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -20,11 +22,14 @@
   // Never on a *.workers.dev address: only through the custom domain that Access protects.
   "workers_dev": false,
   "preview_urls": false,
+  // Live queues (workers/live.ts): one object holds the Supabase Realtime link and the staff pages' sockets.
+  "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveQueues" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveQueues"] }],
   "vars": {
     "DRAFFT_ENV": "local",
     "AUTH_MODE": "dev",
     "SUPABASE_URL": "http://127.0.0.1:55421",
-    "MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
+    "MEDIA_PUBLIC_URL": "https://media-staging.getdrafft.com",
     // Demo pictures (scripts/demo.sh), in the local Storage. Ignored outside local.
     "DEMO_MEDIA_URL": "http://127.0.0.1:55421/storage/v1/object/public/sophros-demo",
     "ACCESS_TEAM_DOMAIN": "",
@@ -33,12 +38,14 @@
   "env": {
     "staging": {
       "name": "sophros-staging",
+      "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveQueues" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveQueues"] }],
       "routes": [{ "pattern": "sophros-staging.getdrafft.com", "custom_domain": true }],
       "vars": {
         "DRAFFT_ENV": "staging",
         "AUTH_MODE": "access",
         "SUPABASE_URL": "https://rjlghcuspdtrmbimyioe.supabase.co",
-        "MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
+        "MEDIA_PUBLIC_URL": "https://media-staging.getdrafft.com",
         // Zero Trust team domain (Settings > Team name and domain)
         "ACCESS_TEAM_DOMAIN": "https://drafft-sophros.cloudflareaccess.com",
         // Access application "sophros staging" > Application Audience (AUD) Tag
@@ -48,12 +55,14 @@
     },
     "production": {
       "name": "sophros-production",
+      "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveQueues" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveQueues"] }],
       "routes": [{ "pattern": "sophros.getdrafft.com", "custom_domain": true }],
       "vars": {
         "DRAFFT_ENV": "production",
         "AUTH_MODE": "access",
         "SUPABASE_URL": "https://wrcpgnqwjmnirjfxpcux.supabase.co",
-        "MEDIA_PUBLIC_URL": "https://pub-f4b77604ea6f42188c3ba8da914a6a16.r2.dev",
+        "MEDIA_PUBLIC_URL": "https://media.getdrafft.com",
         "ACCESS_TEAM_DOMAIN": "https://drafft-sophros.cloudflareaccess.com",
         // Access application "sophros" (production) > Application Audience (AUD) Tag
         "ACCESS_AUD": "5b71180cae071abc0d89edfae898f0054643e4821ab1e67102400e43773efc3c",

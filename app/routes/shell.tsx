@@ -15,6 +15,7 @@ import { AppSidebar } from "~/components/app/app-sidebar";
 import { isActive, nav } from "~/components/app/nav";
 import { useRoot } from "~/components/app/root-data";
 import { SearchCommand } from "~/components/app/search-command";
+import { useLiveQueues } from "~/lib/use-live-queues";
 
 /** Pages can name themselves in the breadcrumb: `export const handle = { crumb: (data) => "…" }`. */
 export interface Crumb {
@@ -57,6 +58,7 @@ function Crumbs() {
 
 export default function Shell() {
   const { sidebarOpen } = useRoot();
+  useLiveQueues();
   const navigation = useNavigation();
   return (
     <SidebarProvider defaultOpen={sidebarOpen}>

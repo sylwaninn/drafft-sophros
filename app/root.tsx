@@ -13,6 +13,8 @@ import { staffContext } from "~/lib/context";
 import { AuthError, identify } from "~/lib/.server/auth";
 import { getConfig } from "~/lib/.server/config";
 import { rpc } from "~/lib/.server/db";
+import { rootRevalidation } from "~/lib/revalidate";
+import { letterShortcutsCookie, letterShortcutsOn } from "~/lib/preferences";
 import { ShieldIcon } from "lucide-react";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "~/components/ui/empty";
 import { Toaster } from "~/components/ui/sonner";
@@ -54,15 +56,17 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Ro
     demoMediaUrl: config.demoMediaUrl,
     theme: cookie(request, "theme") === "light" ? "light" : "dark",
     sidebarOpen: cookie(request, "sidebar_state") !== "false",
+    letterShortcuts: letterShortcutsOn(cookie(request, letterShortcutsCookie)),
     holds: overview.holds,
     queues: overview.queues,
+    countedAt: new Date().toISOString(),
   };
 }
 
-// Revalidate the counters after every change, not on each click between pages.
-export function shouldRevalidate({ formMethod, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
-  return formMethod ? defaultShouldRevalidate : false;
-}
+// The counters are read again after every change, on an explicit re-read of the same page (the live
+// queues socket, useLiveQueues), on the way to "/", and once they are a minute old; not on each click
+// between pages.
+export const shouldRevalidate: (args: ShouldRevalidateFunctionArgs) => boolean = rootRevalidation();
 
 export function meta({ loaderData }: Route.MetaArgs) {
   const env = loaderData?.env;
