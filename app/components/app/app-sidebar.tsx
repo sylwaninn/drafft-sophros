@@ -59,7 +59,8 @@ function NavEntry({ item, active, count }: { item: NavItem; active: boolean; cou
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-        <NavLink to={item.to} viewTransition prefetch="intent">
+        {/* Verifications logs each selfie it shows: it loads when opened, never on hover. */}
+        <NavLink to={item.to} viewTransition prefetch={item.to.startsWith("/verifications") ? "none" : "intent"}>
           <item.icon />
           <span>{item.label}</span>
         </NavLink>
