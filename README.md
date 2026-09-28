@@ -101,10 +101,10 @@ Per environment (`staging` first, then `production`):
    Give sophros its own secret key (Supabase > Settings > API keys) so it can be revoked alone.
 4. Deploys run from GitHub Actions (`.github/workflows/ci.yml`), never from a laptop:
 
-   | Branch    | Deploys                                                                 | How it changes                      |
-   | --------- | ----------------------------------------------------------------------- | ----------------------------------- |
-   | `staging` | `sophros-staging`                                                       | pull requests from feature branches |
-   | `main`    | `sophros-production` (once the variable `PRODUCTION_ENABLED` is `true`) | pull requests from `staging`        |
+   | Branch    | Deploys              | How it changes                      |
+   | --------- | -------------------- | ----------------------------------- |
+   | `staging` | `sophros-staging`    | pull requests from feature branches |
+   | `main`    | `sophros-production` | pull requests from `staging`        |
 
    Every pull request runs: its title (`type(scope): description`), quality (types, ESLint with React hooks
    and accessibility rules, Prettier, tests, build), a dry-run bundle of the Worker for both environments,
