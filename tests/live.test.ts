@@ -43,6 +43,8 @@ describe("parseLiveMessage", () => {
   it("keeps a known queue only", () => {
     expect(parseLiveMessage('{"queue":"reports"}')).toBe("reports");
     expect(parseLiveMessage('{"queue":"payroll"}')).toBeNull();
+    // The failed events and the providers' circuits (drafft-backend 20260928000121).
+    expect(parseLiveMessage('{"queue":"events"}')).toBe("events");
     expect(parseLiveMessage("not json")).toBeNull();
     expect(parseLiveMessage('{"queue":"reports","x":"' + "a".repeat(300) + '"}')).toBeNull();
     expect(parseLiveMessage(new ArrayBuffer(2))).toBeNull();

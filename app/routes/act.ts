@@ -18,6 +18,7 @@ const errors: Record<string, string> = {
   invalid_role: "Unknown role.",
   empty_reply: "Write the reply first.",
   one_account: "These flags belong to more than one account.",
+  invalid_ids: "Choose between 1 and 200 events.",
 };
 
 const holds = new Set<unknown>(["review", "selfie", "banned"]);
@@ -80,8 +81,33 @@ export async function action({ request, context }: Route.ActionArgs) {
         await rpc(staff, "admin_set_support_handled", { p_id: Number(text("id")), p_handled: text("handled") === "true" });
         return result({ ok: true });
       case "support-reply":
-        await rpc(staff, "admin_reply_support", { p_id: Number(text("id")), p_body: text("body"), p_close: text("close") === "true" });
+        // The key the reply form made when it opened: the same reply sent twice (a double press, a retried
+        // request) is one message and one email, the database sees to it.
+        await rpc(staff, "admin_reply_support", {
+          p_id: Number(text("id")),
+          p_body: text("body"),
+          p_close: text("close") === "true",
+          p_idempotency_key: idempotencyKey(text("key")),
+        });
         return result({ ok: true, message: text("close") === "true" ? "Reply sent, request closed." : "Reply sent." });
+      case "events-replay": {
+        const ids = eventIds(form);
+        if (!ids) return result({ ok: false, error: errors.invalid_ids }, 400);
+        const count = await rpc<number>(staff, "admin_replay_events", { p_ids: ids, p_reason: text("reason") || null });
+        return result({
+          ok: true,
+          message: count ? `${count} event${count === 1 ? "" : "s"} sent again.` : "Nothing to replay: already handled.",
+        });
+      }
+      case "events-discard": {
+        const ids = eventIds(form);
+        if (!ids) return result({ ok: false, error: errors.invalid_ids }, 400);
+        const count = await rpc<number>(staff, "admin_discard_events", { p_ids: ids, p_reason: text("reason") });
+        return result({
+          ok: true,
+          message: count ? `${count} event${count === 1 ? "" : "s"} discarded.` : "Nothing to discard: already handled.",
+        });
+      }
       case "data-request":
         await rpc(staff, "admin_fulfil_data_request", { p_id: Number(text("id")) });
         return result({ ok: true });
@@ -157,6 +183,20 @@ export function decisionCall(value: unknown): { fn: `admin_${string}`; args: Rec
     default:
       return null;
   }
+}
+
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A reply's idempotency key, or null (an old form without one, or anything that isn't a UUID). */
+export function idempotencyKey(value: string): string | null {
+  return uuid.test(value) ? value.toLowerCase() : null;
+}
+
+/** The outbox events a replay or a discard names: 1 to 200 whole ids, or null. */
+export function eventIds(form: FormData): number[] | null {
+  const ids = form.getAll("id").map((v) => Number(v));
+  if (ids.length === 0 || ids.length > 200 || !ids.every((id) => Number.isSafeInteger(id) && id > 0)) return null;
+  return [...new Set(ids)];
 }
 
 function result(value: ActResult, status = 200) {
