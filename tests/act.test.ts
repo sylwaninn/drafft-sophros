@@ -131,3 +131,44 @@ describe("support replies", () => {
     expect(idempotencyKey("1; drop table")).toBeNull();
   });
 });
+
+describe("failed events", () => {
+  it("replays a batch in one call", async () => {
+    mockedRpc.mockResolvedValueOnce(2);
+    const answer = await post([
+      ["intent", "events-replay"],
+      ["id", "7"],
+      ["id", "9"],
+      ["id", "7"],
+    ]);
+    expect(mockedRpc.mock.calls[0].slice(1)).toEqual(["admin_replay_events", { p_ids: [7, 9], p_reason: null }]);
+    expect(answer.data).toEqual({ ok: true, message: "2 events sent again." });
+  });
+
+  it("discards with the reason", async () => {
+    mockedRpc.mockResolvedValueOnce(1);
+    const answer = await post({ intent: "events-discard", id: "7", reason: "match gone" });
+    expect(mockedRpc.mock.calls[0].slice(1)).toEqual(["admin_discard_events", { p_ids: [7], p_reason: "match gone" }]);
+    expect(answer.data).toEqual({ ok: true, message: "1 event discarded." });
+  });
+
+  it("says when someone else handled them first", async () => {
+    mockedRpc.mockResolvedValueOnce(0);
+    const answer = await post({ intent: "events-replay", id: "7" });
+    expect(answer.data).toEqual({ ok: true, message: "Nothing to replay: already handled." });
+  });
+
+  it("refuses ids that aren't events without calling the database", async () => {
+    for (const ids of [[], ["x"], ["1.5"], ["-3"], Array.from({ length: 201 }, (_, i) => String(i + 1))]) {
+      const answer = await post([["intent", "events-replay"], ...ids.map((id) => ["id", id] as [string, string])]);
+      expect(answer.init?.status).toBe(400);
+    }
+    expect(mockedRpc).not.toHaveBeenCalled();
+  });
+
+  it("explains a role that can't", async () => {
+    mockedRpc.mockRejectedValueOnce(new DbError("not allowed", "forbidden", 400));
+    const answer = await post({ intent: "events-discard", id: "7", reason: "x" });
+    expect(answer.data).toEqual({ ok: false, error: "Your role doesn't allow this." });
+  });
+});

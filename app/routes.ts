@@ -18,6 +18,7 @@ export default [
       route("support", "routes/support.tsx"),
       route("conversations", "routes/conversations.tsx"),
       route("audit", "routes/audit.tsx"),
+      route("failed-events", "routes/failed-events.tsx"),
       route("staff", "routes/staff.tsx"),
     ]),
   ]),

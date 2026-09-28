@@ -1,8 +1,9 @@
 // Live queues, browser side. The Worker's /live socket says which queue changed ({"queue": "reports"}),
 // never who or what; the page then re-reads its own loaders. Shared by the hook and the tests.
 
-/** The queues drafft-backend announces on `staff:queues` (migration 20260928000071_staff_live_events). */
-export const LIVE_QUEUES = ["reports", "photos", "media", "verifications", "accounts", "support"] as const;
+/** The queues drafft-backend announces on `staff:queues` (migrations 20260928000071_staff_live_events and
+ * 20260928000121_outbox_production, `events`: the failed events and the providers' circuits). */
+export const LIVE_QUEUES = ["reports", "photos", "media", "verifications", "accounts", "support", "events"] as const;
 export type LiveQueue = (typeof LIVE_QUEUES)[number];
 
 export function isLiveQueue(value: unknown): value is LiveQueue {
