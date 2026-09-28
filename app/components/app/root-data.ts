@@ -17,6 +17,8 @@ export interface RootData {
   sidebarOpen: boolean;
   holds: Record<"review" | "selfie" | "banned", number>;
   queues: Record<"selfies" | "reviews" | "selfieOwed" | "reports" | "support" | "exports" | "photos" | "flags", QueueCount>;
+  /** When the server read `holds` and `queues`. */
+  countedAt: string;
 }
 
 export function useRoot(): RootData {
