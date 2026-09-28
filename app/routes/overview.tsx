@@ -25,7 +25,7 @@ function QueueRow({ q, count }: { q: (typeof queues)[number]; count: QueueCount 
   const waiting = count.count > 0;
   return (
     <Item asChild variant="outline" className={waiting ? undefined : "opacity-60"}>
-      <Link to={q.to} viewTransition prefetch="intent">
+      <Link to={q.to} viewTransition prefetch={q.to.startsWith("/verifications") ? "none" : "intent"}>
         <ItemMedia variant="icon">
           <Icon />
         </ItemMedia>

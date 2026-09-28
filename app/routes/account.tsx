@@ -50,6 +50,7 @@ import { useMediaUrl, useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
+import { revalidateOnNewRead } from "~/lib/audited-reads";
 import type { AuditEntry, UserDetail } from "~/lib/types";
 import { reasons } from "./reports";
 import type { Route } from "./+types/account";
@@ -62,6 +63,9 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   ]);
   return { user, audit };
 }
+
+// Another tab shows the same account: it isn't read (nor logged as opened) again.
+export const shouldRevalidate = revalidateOnNewRead(() => "");
 
 export const handle = { crumb: (data: unknown) => (data as { user?: UserDetail } | undefined)?.user?.profile.name || "Account" };
 

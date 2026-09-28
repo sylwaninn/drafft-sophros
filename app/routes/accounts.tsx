@@ -102,12 +102,7 @@ export default function Accounts({ loaderData: { rows, more, page } }: Route.Com
               {rows.map((u) => (
                 <TableRow key={u.id} className="group/row">
                   <TableCell className="pl-4">
-                    <Link
-                      to={`/accounts/${u.id}`}
-                      viewTransition
-                      prefetch="intent"
-                      className="flex items-center gap-2 font-medium group-hover/row:underline"
-                    >
+                    <Link to={`/accounts/${u.id}`} viewTransition className="flex items-center gap-2 font-medium group-hover/row:underline">
                       <PersonAvatar person={u} className="size-7" />
                       {u.name || <span className="text-muted-foreground">No name yet</span>}
                     </Link>
