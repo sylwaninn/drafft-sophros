@@ -18,12 +18,12 @@ vi.mock("~/lib/.server/db", () => {
 vi.mock("~/lib/.server/stream", () => ({ deleteMessage: vi.fn() }));
 
 const { DbError, rpc } = await import("~/lib/.server/db");
-const { action, decisionCall } = await import("~/routes/act");
+const { action, decisionCall, idempotencyKey } = await import("~/routes/act");
 const mockedRpc = vi.mocked(rpc);
 
 type Answer = { data: { ok: boolean; message?: string; error?: string }; init: { status?: number } | null };
 
-async function post(fields: Record<string, string>): Promise<Answer> {
+async function post(fields: Record<string, string> | [string, string][]): Promise<Answer> {
   const context = new RouterContextProvider();
   context.set(staffContext, { email: "mod@drafft.test", role: "moderator" });
   const request = new Request("http://sophros.test/act", { method: "POST", body: new URLSearchParams(fields) });
@@ -108,5 +108,26 @@ describe("act", () => {
     const answer = await post({ intent: "batch", ops: "[]" });
     expect(answer.init?.status).toBe(400);
     expect(mockedRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("support replies", () => {
+  const key = crypto.randomUUID();
+
+  it("sends the reply form's key, so the database sends a reply once", async () => {
+    mockedRpc.mockResolvedValue(null);
+    const reply = { intent: "support-reply", id: "12", body: "Bonjour", close: "true", key };
+    await post(reply);
+    await post(reply);
+    expect(mockedRpc).toHaveBeenCalledTimes(2);
+    for (const call of mockedRpc.mock.calls) {
+      expect(call.slice(1)).toEqual(["admin_reply_support", { p_id: 12, p_body: "Bonjour", p_close: true, p_idempotency_key: key }]);
+    }
+  });
+
+  it("sends no key rather than a malformed one", () => {
+    expect(idempotencyKey(key.toUpperCase())).toBe(key);
+    expect(idempotencyKey("")).toBeNull();
+    expect(idempotencyKey("1; drop table")).toBeNull();
   });
 });

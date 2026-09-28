@@ -80,7 +80,14 @@ export async function action({ request, context }: Route.ActionArgs) {
         await rpc(staff, "admin_set_support_handled", { p_id: Number(text("id")), p_handled: text("handled") === "true" });
         return result({ ok: true });
       case "support-reply":
-        await rpc(staff, "admin_reply_support", { p_id: Number(text("id")), p_body: text("body"), p_close: text("close") === "true" });
+        // The key the reply form made when it opened: the same reply sent twice (a double press, a retried
+        // request) is one message and one email, the database sees to it.
+        await rpc(staff, "admin_reply_support", {
+          p_id: Number(text("id")),
+          p_body: text("body"),
+          p_close: text("close") === "true",
+          p_idempotency_key: idempotencyKey(text("key")),
+        });
         return result({ ok: true, message: text("close") === "true" ? "Reply sent, request closed." : "Reply sent." });
       case "data-request":
         await rpc(staff, "admin_fulfil_data_request", { p_id: Number(text("id")) });
@@ -157,6 +164,13 @@ export function decisionCall(value: unknown): { fn: `admin_${string}`; args: Rec
     default:
       return null;
   }
+}
+
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A reply's idempotency key, or null (an old form without one, or anything that isn't a UUID). */
+export function idempotencyKey(value: string): string | null {
+  return uuid.test(value) ? value.toLowerCase() : null;
 }
 
 function result(value: ActResult, status = 200) {

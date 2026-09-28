@@ -225,7 +225,20 @@ function Thread({ request: r }: { request: SupportRequest }) {
   const form = useRef<HTMLFormElement>(null);
   const formId = useId();
   const [close, setClose] = useState(true);
-  const { fetcher, pending } = useAct({ onDone: () => form.current?.reset() });
+  // One key per reply, made in the browser when the reply box is first used (never during server
+  // rendering) and dropped once it's sent: sending the same reply twice (a double press, a retried
+  // request) is one message and one email (admin_reply_support). Another request, another key.
+  const [replyKey, setReplyKey] = useState<{ request: number; key: string } | null>(null);
+  const key = replyKey?.request === r.id ? replyKey.key : "";
+  const ensureKey = () => {
+    if (!key) setReplyKey({ request: r.id, key: crypto.randomUUID() });
+  };
+  const { fetcher, pending } = useAct({
+    onDone: () => {
+      form.current?.reset();
+      setReplyKey(null);
+    },
+  });
   // A reply is emailed by the backend a moment later: check back until it's sent.
   const revalidator = useRevalidator();
   const sending = r.replies.some((m) => !m.sentAt && !m.error);
@@ -292,6 +305,7 @@ function Thread({ request: r }: { request: SupportRequest }) {
           <input type="hidden" name="intent" value="support-reply" />
           <input type="hidden" name="id" value={r.id} />
           <input type="hidden" name="close" value={String(close)} />
+          <input type="hidden" name="key" value={key} />
           <Field>
             <FieldLabel htmlFor="reply" className="sr-only">
               Reply
@@ -303,6 +317,8 @@ function Thread({ request: r }: { request: SupportRequest }) {
               rows={4}
               maxLength={8000}
               placeholder={`Reply to ${r.person?.name || r.email}, in their language (${r.language.toUpperCase()})`}
+              onFocus={ensureKey}
+              onChange={ensureKey}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
