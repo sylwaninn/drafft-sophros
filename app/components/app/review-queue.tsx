@@ -22,7 +22,7 @@ import { Kbd, KbdGroup } from "~/components/ui/kbd";
 import { Label } from "~/components/ui/label";
 import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
-import type { BatchOp } from "~/routes/act";
+import type { Decision } from "~/routes/act";
 import { useAct } from "./act";
 import { typingIn, useLetterShortcuts } from "./shortcuts";
 
@@ -40,7 +40,8 @@ export interface ReviewAction<T> {
   reason?: (item: T) => string;
   /** What the toast says once it's done. */
   done: string;
-  ops: (item: T, reason: string) => BatchOp[];
+  /** The decision, applied whole in one database transaction. */
+  decide: (item: T, reason: string) => Decision;
 }
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -88,9 +89,10 @@ export function ReviewQueue<T>({
   const run = useCallback(
     (action: ReviewAction<T>, item: T, reason: string) => {
       setDirection(1);
+      // Reloaded even when refused: the item may have been decided on by someone else meanwhile.
       fetcher.submit(
-        { intent: "batch", message: action.done, ops: JSON.stringify(action.ops(item, reason)) },
-        { method: "post", action: "/act" },
+        { intent: "decide", message: action.done, decision: JSON.stringify(action.decide(item, reason)) },
+        { method: "post", action: "/act", defaultShouldRevalidate: true },
       );
     },
     [fetcher],
