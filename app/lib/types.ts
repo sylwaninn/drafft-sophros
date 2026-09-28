@@ -7,7 +7,10 @@ export interface Person {
   name?: string;
   moderation?: Hold | null;
   photo?: string | null;
+  /** Erased: nothing left but the id. */
   deleted?: boolean;
+  /** Deleted by its owner but kept for members' safety (reported, held or banned). */
+  deletedAt?: string | null;
 }
 
 export interface Overview {
@@ -36,6 +39,7 @@ export interface UserRow {
   phone: string | null;
   moderation: Hold | null;
   paused: boolean;
+  deleted_at: string | null;
   onboarded_at: string | null;
   created_at: string;
   last_active_at: string;
@@ -137,7 +141,8 @@ export interface AuditEntry {
 
 export interface Related {
   person: Person;
-  via: "install" | "ip" | "identity";
+  /** previous account: this one signed up again with the identity of a kept deleted account; later: the reverse. */
+  via: "install" | "ip" | "identity" | "previous account" | "later account";
   detail: string | null;
   at: string | null;
 }
@@ -157,6 +162,17 @@ export interface Device {
   last_seen_at: string;
 }
 
+/** Why an account deleted by its owner was kept (admin_account_deletion). */
+export interface AccountDeletion {
+  deletedAt: string;
+  basis: "ban" | "hold" | "report";
+  legalBasis: "member_safety";
+  moderation: Hold | null;
+  reports: { id: string; reason: string; createdAt: string; handledAt: string | null; resolution: string | null }[];
+  holds: { state: Hold; note: string | null; createdAt: string }[];
+  identities: { email?: string | null; phone?: string | null; oauth?: { provider: string; email: string | null }[] };
+}
+
 export interface UserDetail {
   profile: Record<string, unknown> & {
     id: string;
@@ -165,6 +181,7 @@ export interface UserDetail {
     gender: string | null;
     moderation: Hold | null;
     paused: boolean;
+    deleted_at: string | null;
     created_at: string;
     last_active_at: string;
     onboarded_at: string | null;
