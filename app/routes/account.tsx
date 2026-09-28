@@ -272,7 +272,7 @@ function MoreMenu({ u, moderator }: { u: UserDetail; moderator: boolean }) {
           intent="revoke-sessions"
           fields={{ user: u.profile.id }}
           title="Sign out everywhere"
-          description={`Ends ${u.sessions.length} open session${u.sessions.length === 1 ? "" : "s"}. The app asks them to sign in again within the hour.`}
+          description={`Ends ${u.sessions.length} open session${u.sessions.length === 1 ? "" : "s"}. They're signed out now.`}
           submit="Sign out everywhere"
           open={revoking}
           onOpenChange={setRevoking}
