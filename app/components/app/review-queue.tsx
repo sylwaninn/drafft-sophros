@@ -3,16 +3,28 @@
 import { useCallback, useEffect, useEffectEvent, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { type LucideIcon, ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "~/components/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "~/components/ui/field";
 import { Kbd, KbdGroup } from "~/components/ui/kbd";
+import { Label } from "~/components/ui/label";
 import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
 import type { BatchOp } from "~/routes/act";
 import { useAct } from "./act";
+import { typingIn, useLetterShortcuts } from "./shortcuts";
 
 export interface ReviewAction<T> {
   id: string;
@@ -93,14 +105,16 @@ export function ReviewQueue<T>({
     [current, pending, run],
   );
 
-  // Keyboard: ← → move, a letter decides.
+  // Keyboard: ← → move, a letter decides (unless letters are off). Never while typing in a field or
+  // with a dialog or menu open.
+  const [letters, setLetters] = useLetterShortcuts();
   const onKey = useEffectEvent((event: KeyboardEvent) => {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
-    if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+    if (typingIn(event.target)) return;
+    if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (event.key === "ArrowLeft") return (event.preventDefault(), go(at - 1));
     if (event.key === "ArrowRight") return (event.preventDefault(), go(at + 1));
+    if (!letters || event.repeat) return;
     const key = event.key.toLowerCase();
     const action = actions.find((a) => a.key === key && (!a.available || (current && a.available(current))));
     if (action) {
@@ -172,7 +186,7 @@ export function ReviewQueue<T>({
                     <a.icon data-icon="inline-start" />
                   )}
                   {a.label}
-                  <Kbd className="ml-1">{a.key.toUpperCase()}</Kbd>
+                  {letters && <Kbd className="ml-1">{a.key.toUpperCase()}</Kbd>}
                 </Button>
               ))}
               {extra?.(current)}
@@ -187,8 +201,16 @@ export function ReviewQueue<T>({
               move without deciding
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Kbd>{shown.map((a) => a.key.toUpperCase()).join(" ")}</Kbd>
-              decide: it applies at once, then the next one comes
+              <Checkbox id="letter-shortcuts" checked={letters} onCheckedChange={(v) => setLetters(v === true)} />
+              <Label htmlFor="letter-shortcuts" className="font-normal text-muted-foreground">
+                Letters decide
+              </Label>
+              {letters && (
+                <>
+                  <Kbd>{shown.map((a) => a.key.toUpperCase()).join(" ")}</Kbd>
+                  it applies at once, then the next one comes
+                </>
+              )}
             </span>
           </p>
         </div>
@@ -225,6 +247,68 @@ function ReasonPrompt<T>({
   const [reason, setReason] = useState("");
   const prompt = action.prompt!;
   const submit = () => reason.trim() && onConfirm(reason.trim());
+  const form = (
+    <form
+      className="grid gap-6"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <Field>
+        <FieldLabel htmlFor="decision-reason">Reason</FieldLabel>
+        <Textarea
+          id="decision-reason"
+          required
+          rows={3}
+          maxLength={1000}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={prompt.placeholder ?? "What you saw, for the audit log"}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <FieldDescription>Saved with your email in the audit log.</FieldDescription>
+      </Field>
+      {prompt.destructive ? (
+        <AlertDialogFooter>
+          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+          <Button type="submit" variant="destructive" disabled={!reason.trim()}>
+            {action.label}
+          </Button>
+        </AlertDialogFooter>
+      ) : (
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" disabled={!reason.trim()}>
+            {action.label}
+          </Button>
+        </DialogFooter>
+      )}
+    </form>
+  );
+  // A ban is asked in an alert dialog, like every ban in sophros.
+  if (prompt.destructive) {
+    return (
+      <AlertDialog open onOpenChange={(open) => !open && onCancel()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{prompt.title(item)}</AlertDialogTitle>
+            <AlertDialogDescription>{prompt.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          {form}
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
       <DialogContent>
@@ -232,43 +316,7 @@ function ReasonPrompt<T>({
           <DialogTitle>{prompt.title(item)}</DialogTitle>
           <DialogDescription>{prompt.description}</DialogDescription>
         </DialogHeader>
-        <form
-          className="grid gap-6"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
-        >
-          <Field>
-            <FieldLabel htmlFor="decision-reason">Reason</FieldLabel>
-            <Textarea
-              id="decision-reason"
-              required
-              rows={3}
-              maxLength={1000}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={prompt.placeholder ?? "What you saw, for the audit log"}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-            />
-            <FieldDescription>Saved with your email in the audit log.</FieldDescription>
-          </Field>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" variant={prompt.destructive ? "destructive" : "default"} disabled={!reason.trim()}>
-              {action.label}
-            </Button>
-          </DialogFooter>
-        </form>
+        {form}
       </DialogContent>
     </Dialog>
   );

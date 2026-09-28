@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { MessagesSquareIcon, ShieldAlertIcon } from "lucide-react";
+import { ArrowRightIcon, MessagesSquareIcon, ShieldAlertIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
@@ -66,7 +66,8 @@ export default function Reports({ loaderData: { reports } }: Route.ComponentProp
                 <TableHead>By</TableHead>
                 <TableHead>Details</TableHead>
                 <TableHead>Received</TableHead>
-                <TableHead className="pr-4 text-right">Status</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="pr-4 text-right" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -90,7 +91,7 @@ export default function Reports({ loaderData: { reports } }: Route.ComponentProp
                   <TableCell>
                     <TimeAgo value={r.createdAt} />
                   </TableCell>
-                  <TableCell className="pr-4 text-right">
+                  <TableCell>
                     {r.handledAt ? (
                       <Badge variant="outline">Closed</Badge>
                     ) : (r.reportedCount30d ?? 0) > 1 ? (
@@ -98,6 +99,14 @@ export default function Reports({ loaderData: { reports } }: Route.ComponentProp
                     ) : (
                       <Badge>Open</Badge>
                     )}
+                  </TableCell>
+                  <TableCell className="pr-4 text-right">
+                    {/* The row opens on a click; this is its keyboard way in. */}
+                    <Button variant="ghost" size="sm" onClick={() => setOpenId(r.id)}>
+                      Open
+                      <span className="sr-only">the report on {r.reported?.name || "this account"}</span>
+                      <ArrowRightIcon data-icon="inline-end" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

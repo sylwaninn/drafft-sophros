@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Form, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
-import { CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -130,7 +130,8 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
                     <TableHead>From</TableHead>
                     <TableHead>Message</TableHead>
                     <TableHead>Received</TableHead>
-                    <TableHead className="pr-4 text-right">Status</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="pr-4 text-right" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -152,8 +153,14 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
                       <TableCell>
                         <TimeAgo value={s.created_at} />
                       </TableCell>
+                      <TableCell>{s.handled_at ? <Badge variant="outline">Handled</Badge> : <Badge>Open</Badge>}</TableCell>
                       <TableCell className="pr-4 text-right">
-                        {s.handled_at ? <Badge variant="outline">Handled</Badge> : <Badge>Open</Badge>}
+                        {/* The row opens on a click; this is its keyboard way in. */}
+                        <Button variant="ghost" size="sm" onClick={() => open(s)}>
+                          Open
+                          <span className="sr-only">request {s.reference}</span>
+                          <ArrowRightIcon data-icon="inline-end" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

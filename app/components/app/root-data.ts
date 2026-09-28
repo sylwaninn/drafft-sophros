@@ -15,6 +15,8 @@ export interface RootData {
   demoMediaUrl: string | null;
   theme: Theme;
   sidebarOpen: boolean;
+  /** Whether single-letter shortcuts decide in the review queues. */
+  letterShortcuts: boolean;
   holds: Record<"review" | "selfie" | "banned", number>;
   queues: Record<"selfies" | "reviews" | "selfieOwed" | "reports" | "support" | "exports" | "photos" | "flags", QueueCount>;
   /** When the server read `holds` and `queues`. */

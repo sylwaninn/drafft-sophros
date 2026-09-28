@@ -4,6 +4,7 @@ export default [
   route("act", "routes/act.ts"),
   route("search", "routes/search.ts"),
   route("theme", "routes/theme.ts"),
+  route("letter-shortcuts", "routes/letter-shortcuts.ts"),
   route("conversation-data/:id", "routes/conversation-data.ts"),
   layout("routes/shell.tsx", [
     layout("routes/pane.tsx", [
