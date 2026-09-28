@@ -6,6 +6,7 @@ export default [
   route("theme", "routes/theme.ts"),
   route("letter-shortcuts", "routes/letter-shortcuts.ts"),
   route("conversation-data/:id", "routes/conversation-data.ts"),
+  route("media/*", "routes/media.ts"),
   layout("routes/shell.tsx", [
     layout("routes/pane.tsx", [
       index("routes/overview.tsx"),

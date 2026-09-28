@@ -96,6 +96,7 @@ Per environment (`staging` first, then `production`):
    pnpm exec wrangler secret put SUPABASE_SECRET_KEY --env staging   # an sb_secret_ key made for sophros
    pnpm exec wrangler secret put STREAM_API_KEY --env staging
    pnpm exec wrangler secret put STREAM_API_SECRET --env staging
+   pnpm exec wrangler secret put MEDIA_SIGNING_KEY --env staging    # the backend's MEDIA_SIGNING_KEY for staging
    ```
    Give sophros its own secret key (Supabase > Settings > API keys) so it can be revoked alone.
 4. Deploys run from GitHub Actions (`.github/workflows/ci.yml`), never from a laptop:
