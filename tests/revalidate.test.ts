@@ -6,7 +6,7 @@ const url = (path: string) => new URL(path, "https://sophros.test");
 function setup(staleMs = 60_000) {
   let clock = 1_000_000;
   const should = rootRevalidation(staleMs, () => clock);
-  const navigate = (path: string) => should({ nextUrl: url(path), defaultShouldRevalidate: true });
+  const navigate = (path: string) => should({ currentUrl: url("/elsewhere"), nextUrl: url(path), defaultShouldRevalidate: true });
   return { should, navigate, advance: (ms: number) => (clock += ms) };
 }
 
@@ -42,12 +42,19 @@ describe("rootRevalidation", () => {
 
   it("follows the router after a submission", () => {
     const { should, navigate, advance } = setup();
-    const submit = (defaultShouldRevalidate: boolean) => should({ formMethod: "POST", nextUrl: url("/reports"), defaultShouldRevalidate });
+    const submit = (defaultShouldRevalidate: boolean) =>
+      should({ formMethod: "POST", currentUrl: url("/reports"), nextUrl: url("/reports"), defaultShouldRevalidate });
     expect(submit(true)).toBe(true);
     expect(submit(false)).toBe(false);
     advance(30_000);
     expect(navigate("/reports")).toBe(false);
     advance(30_000);
     expect(navigate("/reports")).toBe(true);
+  });
+
+  it("reads them again on an explicit re-read of the same page, however fresh", () => {
+    const { should } = setup();
+    expect(should({ currentUrl: url("/reports?q=x"), nextUrl: url("/reports?q=x"), defaultShouldRevalidate: true })).toBe(true);
+    expect(should({ currentUrl: url("/reports"), nextUrl: url("/reports?q=x"), defaultShouldRevalidate: true })).toBe(false);
   });
 });

@@ -20,6 +20,9 @@
   // Never on a *.workers.dev address: only through the custom domain that Access protects.
   "workers_dev": false,
   "preview_urls": false,
+  // Live queues (workers/live.ts): one object holds the Supabase Realtime link and the staff pages' sockets.
+  "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveQueues" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveQueues"] }],
   "vars": {
     "DRAFFT_ENV": "local",
     "AUTH_MODE": "dev",
@@ -33,6 +36,8 @@
   "env": {
     "staging": {
       "name": "sophros-staging",
+      "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveQueues" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveQueues"] }],
       "routes": [{ "pattern": "sophros-staging.getdrafft.com", "custom_domain": true }],
       "vars": {
         "DRAFFT_ENV": "staging",
@@ -48,6 +53,8 @@
     },
     "production": {
       "name": "sophros-production",
+      "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveQueues" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveQueues"] }],
       "routes": [{ "pattern": "sophros.getdrafft.com", "custom_domain": true }],
       "vars": {
         "DRAFFT_ENV": "production",
