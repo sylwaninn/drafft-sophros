@@ -3,6 +3,15 @@
 import { useCallback, useEffect, useEffectEvent, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { type LucideIcon, ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
@@ -238,6 +247,68 @@ function ReasonPrompt<T>({
   const [reason, setReason] = useState("");
   const prompt = action.prompt!;
   const submit = () => reason.trim() && onConfirm(reason.trim());
+  const form = (
+    <form
+      className="grid gap-6"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <Field>
+        <FieldLabel htmlFor="decision-reason">Reason</FieldLabel>
+        <Textarea
+          id="decision-reason"
+          required
+          rows={3}
+          maxLength={1000}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={prompt.placeholder ?? "What you saw, for the audit log"}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <FieldDescription>Saved with your email in the audit log.</FieldDescription>
+      </Field>
+      {prompt.destructive ? (
+        <AlertDialogFooter>
+          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+          <Button type="submit" variant="destructive" disabled={!reason.trim()}>
+            {action.label}
+          </Button>
+        </AlertDialogFooter>
+      ) : (
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" disabled={!reason.trim()}>
+            {action.label}
+          </Button>
+        </DialogFooter>
+      )}
+    </form>
+  );
+  // A ban is asked in an alert dialog, like every ban in sophros.
+  if (prompt.destructive) {
+    return (
+      <AlertDialog open onOpenChange={(open) => !open && onCancel()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{prompt.title(item)}</AlertDialogTitle>
+            <AlertDialogDescription>{prompt.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          {form}
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
       <DialogContent>
@@ -245,43 +316,7 @@ function ReasonPrompt<T>({
           <DialogTitle>{prompt.title(item)}</DialogTitle>
           <DialogDescription>{prompt.description}</DialogDescription>
         </DialogHeader>
-        <form
-          className="grid gap-6"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
-        >
-          <Field>
-            <FieldLabel htmlFor="decision-reason">Reason</FieldLabel>
-            <Textarea
-              id="decision-reason"
-              required
-              rows={3}
-              maxLength={1000}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={prompt.placeholder ?? "What you saw, for the audit log"}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-            />
-            <FieldDescription>Saved with your email in the audit log.</FieldDescription>
-          </Field>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" variant={prompt.destructive ? "destructive" : "default"} disabled={!reason.trim()}>
-              {action.label}
-            </Button>
-          </DialogFooter>
-        </form>
+        {form}
       </DialogContent>
     </Dialog>
   );
