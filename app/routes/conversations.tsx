@@ -24,6 +24,7 @@ import { ConversationDrawer } from "~/components/app/conversation-drawer";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import type { MatchRow, Person, UserRow } from "~/lib/types";
+import { pageParam } from "~/lib/paging";
 import type { Route } from "./+types/conversations";
 
 const pageSize = 60;
@@ -33,7 +34,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const staff = context.get(staffContext);
   const url = new URL(request.url);
   const p = url.searchParams;
-  const page = Math.max(0, Number(p.get("page")) || 0);
+  const page = pageParam(p.get("page"));
   const user = p.get("user");
   const status = p.get("status");
   const rows = await query<MatchRow[]>(staff, "admin_matches", {
