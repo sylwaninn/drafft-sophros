@@ -10,7 +10,7 @@
  *   wrangler secret put STREAM_API_KEY --env <env>
  *   wrangler secret put STREAM_API_SECRET --env <env>
  *   wrangler secret put MEDIA_SIGNING_KEY --env <env>   the backend's, same environment (private media)
- * MEDIA_PUBLIC_URL moves to the media Worker's domain (media-staging / media.getdrafft.com) once it's live.
+ * MEDIA_PUBLIC_URL: local and staging use the media Worker (media-staging.getdrafft.com); production moves to media.getdrafft.com once its Worker is live.
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -29,7 +29,7 @@
     "DRAFFT_ENV": "local",
     "AUTH_MODE": "dev",
     "SUPABASE_URL": "http://127.0.0.1:55421",
-    "MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
+    "MEDIA_PUBLIC_URL": "https://media-staging.getdrafft.com",
     // Demo pictures (scripts/demo.sh), in the local Storage. Ignored outside local.
     "DEMO_MEDIA_URL": "http://127.0.0.1:55421/storage/v1/object/public/sophros-demo",
     "ACCESS_TEAM_DOMAIN": "",
@@ -45,7 +45,7 @@
         "DRAFFT_ENV": "staging",
         "AUTH_MODE": "access",
         "SUPABASE_URL": "https://rjlghcuspdtrmbimyioe.supabase.co",
-        "MEDIA_PUBLIC_URL": "https://pub-2877e6f189f0420785f5cd685f44f789.r2.dev",
+        "MEDIA_PUBLIC_URL": "https://media-staging.getdrafft.com",
         // Zero Trust team domain (Settings > Team name and domain)
         "ACCESS_TEAM_DOMAIN": "https://drafft-sophros.cloudflareaccess.com",
         // Access application "sophros staging" > Application Audience (AUD) Tag
