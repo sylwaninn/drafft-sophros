@@ -35,7 +35,13 @@ append-only audit log.
   devices (model, iOS, app version, locale, time zone), IPs and countries, approximate location, holds
   and their history, reports, blocks, flags, related accounts (same install, IP or marked identity),
   matches and conversations, purchases, support, staff notes.
-- Every action takes a reason; reading a conversation or a selfie is logged too.
+- Every action takes a reason; reading a conversation or a selfie is logged too, and opens only for a
+  reason the person types.
+- A decision the member is told about (a hold, a ban, a refused photo, a deleted message) also takes the
+  reason they're told, from a fixed list tied to the terms, and optionally a note sent to them as written
+  (DSA statement of reasons). The internal reason never reaches them.
+- A conversation opens only on a basis on record: a report between the two, a help request from either,
+  or a hold on either account. Without one, only an admin reads it, as a logged override.
 - Desktop browser, behind Cloudflare Access; the environment (local, staging, production) must be
   unmistakable.
 
@@ -66,6 +72,7 @@ No real member data in the repository. Demo accounts and pictures only, local da
 3. The queue is the unit of work: show what waits, oldest first, and get out of the way.
 4. Destructive actions are deliberate; reversible ones are fast.
 5. Least exposure: private content (conversations, selfies) is opened for a reason, not browsed.
+6. Members are told why: every decision about them carries its reason, in words they can contest.
 
 ## Accessibility & Inclusion
 
