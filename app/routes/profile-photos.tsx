@@ -7,6 +7,7 @@ import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
+import { suggestedCategory } from "~/lib/reasons";
 import type { Person } from "~/lib/types";
 import type { Route } from "./+types/profile-photos";
 
@@ -51,8 +52,14 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     label: "Refuse",
     icon: XIcon,
     available: pending,
-    done: "Photo refused: they can ask for a second look.",
-    decide: (m) => ({ intent: "media", media: m.id, approved: false }),
+    prompt: {
+      title: (m) => `Refuse ${m.person.name ? `${m.person.name}'s` : "this"} photo?`,
+      description: "They're told why, and can ask for a second look.",
+    },
+    statement: { category: suggestedCategory("photo") },
+    reason: (m) => `profile photo refused: ${labels(m)}`,
+    done: "Photo refused: they're told why and can ask for a second look.",
+    decide: (m, { reason, category, details }) => ({ intent: "media", media: m.id, approved: false, reason, category, details }),
   },
   {
     id: "keep",
@@ -79,10 +86,15 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     label: "Refuse and hold the account",
     icon: ShieldQuestionIcon,
     available: holdable,
+    prompt: {
+      title: (m) => `Refuse the photo and hold ${m.person.name || "this account"}?`,
+      description: "The photo stays hidden and the account is frozen until someone clears it. They're told why.",
+    },
+    statement: { category: suggestedCategory("photo") },
     reason: (m) => `profile photo refused: ${labels(m)}`,
     done: "Photo refused, account held for review.",
     // A pending photo is refused with the account decision; an already refused one has its flags closed.
-    decide: (m, reason) => ({ intent: "photo", media: m.id, reason, hold: "review" }),
+    decide: (m, { reason, category, details }) => ({ intent: "photo", media: m.id, reason, hold: "review", category, details }),
   },
   {
     id: "ban",
@@ -96,8 +108,9 @@ const actions: ReviewAction<ProfilePhoto>[] = [
       description: "The photo stays refused and the account is closed: its email, phone and sign-ins can't come back.",
       destructive: true,
     },
+    statement: {},
     done: "Photo refused, account banned.",
-    decide: (m, reason) => ({ intent: "photo", media: m.id, reason, hold: "banned" }),
+    decide: (m, { reason, category, details }) => ({ intent: "photo", media: m.id, reason, hold: "banned", category, details }),
   },
 ];
 

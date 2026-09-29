@@ -39,9 +39,11 @@ import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
 import { can } from "~/lib/roles";
+import { suggestedCategory, type Statement } from "~/lib/reasons";
 import type { Hold } from "~/lib/types";
 import type { ActResult } from "~/routes/act";
 import { useRoot } from "./root-data";
+import { StatementFields, statementReady } from "./statement-fields";
 
 type Fields = Record<string, string | number | null | undefined | (string | number)[]>;
 
@@ -94,22 +96,26 @@ export function ActButton({
 
 /**
  * A change that needs a reason for the audit log, asked in a dialog. `destructive` asks in an alert
- * dialog instead (bans, deletions). Extra inputs go in `children`.
+ * dialog instead (bans, deletions). `statement`: the member is told this decision and why, so the
+ * dialog also asks for the reason category they're told (preselected when `statement.category` is
+ * given) and a note for them; the reason typed here then stays internal. Extra inputs go in `children`.
  */
 export function ReasonDialog({
   intent,
   fields = {},
   title,
   description,
-  label = "Reason",
+  label,
   placeholder = "What you saw, for the audit log",
   submit,
   destructive = false,
   defaultReason = "",
   required = true,
   reasonName = "reason",
+  statement,
   open,
   onOpenChange,
+  onDone,
   trigger,
   children,
 }: {
@@ -124,57 +130,41 @@ export function ReasonDialog({
   defaultReason?: string;
   required?: boolean;
   reasonName?: string;
+  statement?: { category?: string };
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Once the change is applied (the dialog then closes). */
+  onDone?: () => void;
   trigger?: ReactNode;
   children?: ReactNode;
 }) {
   const [innerOpen, setInnerOpen] = useState(false);
   const isOpen = open ?? innerOpen;
   const setOpen = onOpenChange ?? setInnerOpen;
-  const { fetcher, pending } = useAct({ onDone: () => setOpen(false) });
+  const act = useAct({
+    onDone: () => {
+      setOpen(false);
+      onDone?.();
+    },
+  });
 
+  // Mounted with the dialog's content: every opening starts from a blank form.
   const form = (
-    <fetcher.Form method="post" action="/act" defaultShouldRevalidate className="grid gap-6">
-      <Hidden intent={intent} fields={fields} />
-      <FieldGroup>
-        {children}
-        <Field>
-          <FieldLabel htmlFor={`${intent}-${reasonName}`}>{label}</FieldLabel>
-          <Textarea
-            id={`${intent}-${reasonName}`}
-            name={reasonName}
-            required={required}
-            maxLength={1000}
-            rows={3}
-            defaultValue={defaultReason}
-            placeholder={placeholder}
-          />
-          {required && <FieldDescription>Saved with your email in the audit log.</FieldDescription>}
-        </Field>
-      </FieldGroup>
-      {destructive ? (
-        <AlertDialogFooter>
-          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-          <Button type="submit" variant="destructive" disabled={pending}>
-            {pending && <Spinner data-icon="inline-start" />}
-            {submit}
-          </Button>
-        </AlertDialogFooter>
-      ) : (
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Cancel
-            </Button>
-          </DialogClose>
-          <Button type="submit" disabled={pending}>
-            {pending && <Spinner data-icon="inline-start" />}
-            {submit}
-          </Button>
-        </DialogFooter>
-      )}
-    </fetcher.Form>
+    <ReasonForm
+      act={act}
+      intent={intent}
+      fields={fields}
+      label={label ?? (statement ? "Internal reason" : "Reason")}
+      placeholder={placeholder}
+      submit={submit}
+      destructive={destructive}
+      defaultReason={defaultReason}
+      required={required}
+      reasonName={reasonName}
+      statement={statement}
+    >
+      {children}
+    </ReasonForm>
   );
 
   if (destructive) {
@@ -206,6 +196,84 @@ export function ReasonDialog({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function ReasonForm({
+  act: { fetcher, pending },
+  intent,
+  fields,
+  label,
+  placeholder,
+  submit,
+  destructive,
+  defaultReason,
+  required,
+  reasonName,
+  statement,
+  children,
+}: {
+  act: ReturnType<typeof useAct>;
+  intent: string;
+  fields: Fields;
+  label: string;
+  placeholder: string;
+  submit: string;
+  destructive: boolean;
+  defaultReason: string;
+  required: boolean;
+  reasonName: string;
+  statement?: { category?: string };
+  children?: ReactNode;
+}) {
+  const [told, setTold] = useState<Statement>({ category: statement?.category });
+  const ready = !statement || statementReady(told);
+  return (
+    <fetcher.Form method="post" action="/act" defaultShouldRevalidate className="grid gap-6">
+      <Hidden intent={intent} fields={fields} />
+      <FieldGroup>
+        {children}
+        {statement && <StatementFields id={intent} value={told} onChange={setTold} />}
+        <Field>
+          <FieldLabel htmlFor={`${intent}-${reasonName}`}>{label}</FieldLabel>
+          <Textarea
+            id={`${intent}-${reasonName}`}
+            name={reasonName}
+            required={required}
+            maxLength={1000}
+            rows={3}
+            defaultValue={defaultReason}
+            placeholder={placeholder}
+          />
+          {required && (
+            <FieldDescription>
+              {statement ? "Not sent to them: saved with your email in the audit log." : "Saved with your email in the audit log."}
+            </FieldDescription>
+          )}
+        </Field>
+      </FieldGroup>
+      {destructive ? (
+        <AlertDialogFooter>
+          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+          <Button type="submit" variant="destructive" disabled={pending || !ready}>
+            {pending && <Spinner data-icon="inline-start" />}
+            {submit}
+          </Button>
+        </AlertDialogFooter>
+      ) : (
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" disabled={pending || !ready}>
+            {pending && <Spinner data-icon="inline-start" />}
+            {submit}
+          </Button>
+        </DialogFooter>
+      )}
+    </fetcher.Form>
   );
 }
 
@@ -273,6 +341,7 @@ export function RestrictMenu({
           open={chosen !== null}
           onOpenChange={(open) => !open && setChosen(null)}
           destructive={choice.state === "banned"}
+          statement={{ category: suggestedCategory(choice.state) }}
           title={`${choice.label}: ${name || "this account"}`}
           description={choice.description}
           submit={choice.label}

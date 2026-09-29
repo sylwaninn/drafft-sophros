@@ -9,6 +9,7 @@ import { AccountPanel, ReviewStage, type AccountBrief } from "~/components/app/r
 import { ReviewQueue, type ReviewAction } from "~/components/app/review-queue";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
+import { suggestedCategory } from "~/lib/reasons";
 import type { Flag as FlagRow, Person } from "~/lib/types";
 import type { Route } from "./+types/shared-media";
 
@@ -54,9 +55,22 @@ const actions: ReviewAction<Flag>[] = [
     label: "Hold for review",
     icon: ShieldQuestionIcon,
     available: holdable,
+    prompt: {
+      title: (f) => `Hold ${f.person?.name || "this account"} for review?`,
+      description: "Freezes the account until someone clears it. They're told why.",
+    },
+    statement: {},
     reason: why,
     done: "Account held for review.",
-    decide: (f, reason) => ({ intent: "flags", ids: [f.id], reason: "account held for review", hold: "review", holdReason: reason }),
+    decide: (f, { reason, category, details }) => ({
+      intent: "flags",
+      ids: [f.id],
+      reason: "account held for review",
+      hold: "review",
+      holdReason: reason,
+      category,
+      details,
+    }),
   },
   {
     id: "selfie",
@@ -64,9 +78,22 @@ const actions: ReviewAction<Flag>[] = [
     label: "Ask for a selfie",
     icon: ScanFaceIcon,
     available: holdable,
+    prompt: {
+      title: (f) => `Ask ${f.person?.name || "this account"} for a selfie?`,
+      description: "Freezes the account until they send a selfie. They're told why.",
+    },
+    statement: { category: suggestedCategory("selfie") },
     reason: why,
     done: "Selfie asked: the account is frozen until they send it.",
-    decide: (f, reason) => ({ intent: "flags", ids: [f.id], reason: "selfie asked", hold: "selfie", holdReason: reason }),
+    decide: (f, { reason, category, details }) => ({
+      intent: "flags",
+      ids: [f.id],
+      reason: "selfie asked",
+      hold: "selfie",
+      holdReason: reason,
+      category,
+      details,
+    }),
   },
   {
     id: "ban",
@@ -80,8 +107,17 @@ const actions: ReviewAction<Flag>[] = [
       description: "Closes the account for good: its email, phone and sign-ins can't come back.",
       destructive: true,
     },
+    statement: {},
     done: "Account banned.",
-    decide: (f, reason) => ({ intent: "flags", ids: [f.id], reason: "account banned", hold: "banned", holdReason: reason }),
+    decide: (f, { reason, category, details }) => ({
+      intent: "flags",
+      ids: [f.id],
+      reason: "account banned",
+      hold: "banned",
+      holdReason: reason,
+      category,
+      details,
+    }),
   },
 ];
 

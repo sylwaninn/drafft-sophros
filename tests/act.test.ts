@@ -18,7 +18,7 @@ vi.mock("~/lib/.server/db", () => {
 vi.mock("~/lib/.server/stream", () => ({ deleteMessage: vi.fn() }));
 
 const { DbError, rpc } = await import("~/lib/.server/db");
-const { action, decisionCall, idempotencyKey } = await import("~/routes/act");
+const { action, decisionCall, idempotencyKey, Refusal } = await import("~/routes/act");
 const mockedRpc = vi.mocked(rpc);
 
 type Answer = { data: { ok: boolean; message?: string; error?: string }; init: { status?: number } | null };
@@ -30,15 +30,30 @@ async function post(fields: Record<string, string> | [string, string][]): Promis
   return (await action({ request, context, params: {} } as unknown as Parameters<typeof action>[0])) as unknown as Answer;
 }
 
-const ban = { intent: "flags", ids: [7], reason: "account banned", hold: "banned", holdReason: "nudity in a chat" };
+const ban = {
+  intent: "flags",
+  ids: [7],
+  reason: "account banned",
+  hold: "banned",
+  holdReason: "nudity in a chat",
+  category: "sexual_content",
+  details: "Photos sexuelles envoyées sans accord.",
+};
 
 beforeEach(() => mockedRpc.mockReset());
 
 describe("decisionCall", () => {
-  it("makes a flag decision with its hold one call", () => {
+  it("makes a flag decision with its hold one call, with what the member is told", () => {
     expect(decisionCall(ban)).toEqual({
       fn: "admin_decide_flags",
-      args: { p_ids: [7], p_reason: "account banned", p_hold: "banned", p_hold_reason: "nudity in a chat" },
+      args: {
+        p_ids: [7],
+        p_reason: "account banned",
+        p_hold: "banned",
+        p_hold_reason: "nudity in a chat",
+        p_category: "sexual_content",
+        p_details: "Photos sexuelles envoyées sans accord.",
+      },
     });
     expect(decisionCall({ intent: "flags", ids: [7], reason: "nothing wrong" })).toEqual({
       fn: "admin_decide_flags",
@@ -47,14 +62,32 @@ describe("decisionCall", () => {
   });
 
   it("makes a photo refusal with its hold one call", () => {
-    expect(decisionCall({ intent: "photo", media: "m1", reason: "profile photo refused", hold: "review" })).toEqual({
+    expect(
+      decisionCall({ intent: "photo", media: "m1", reason: "profile photo refused", hold: "review", category: "photo_guidelines" }),
+    ).toEqual({
       fn: "admin_decide_photo",
-      args: { p_media: "m1", p_reason: "profile photo refused", p_hold: "review" },
+      args: { p_media: "m1", p_reason: "profile photo refused", p_hold: "review", p_category: "photo_guidelines", p_details: null },
     });
     expect(decisionCall({ intent: "media", media: "m1", approved: true })).toEqual({
       fn: "admin_review_media",
       args: { p_media: "m1", p_approved: true, p_reason: null },
     });
+    expect(decisionCall({ intent: "media", media: "m1", approved: false, category: "photo_guidelines", details: "  " })).toEqual({
+      fn: "admin_review_media",
+      args: { p_media: "m1", p_approved: false, p_reason: null, p_category: "photo_guidelines", p_details: null },
+    });
+  });
+
+  it("tells the member nothing when nothing reaches them", () => {
+    expect(decisionCall({ intent: "flags", ids: [7], reason: "nothing wrong", category: "hate" })?.args).not.toHaveProperty("p_category");
+  });
+
+  it("refuses a decision the member is told about without its reason category", () => {
+    const { category: _, ...uncategorised } = ban;
+    expect(() => decisionCall(uncategorised)).toThrow(Refusal);
+    expect(() => decisionCall({ intent: "media", media: "m1", approved: false })).toThrow("Choose the reason they're told.");
+    expect(() => decisionCall({ intent: "photo", media: "m1", hold: "banned", category: " " })).toThrow(Refusal);
+    expect(() => decisionCall({ ...ban, details: "x".repeat(1001) })).toThrow("1,000 characters");
   });
 
   it("refuses what the dashboard doesn't decide", () => {
@@ -90,16 +123,75 @@ describe("act", () => {
     expect(mockedRpc).not.toHaveBeenCalled();
   });
 
-  it("closes a report and holds its account in one call", async () => {
+  it("closes a report and holds its account in one call, with what they're told", async () => {
     mockedRpc.mockResolvedValueOnce(null);
-    await post({ intent: "report", report: "r1", user: "u1", resolution: "insults", hold: "banned" });
+    await post({ intent: "report", report: "r1", user: "u1", resolution: "insults", hold: "banned", category: "harassment", details: "" });
     expect(mockedRpc).toHaveBeenCalledTimes(1);
-    expect(mockedRpc.mock.calls[0].slice(1)).toEqual(["admin_close_report", { p_report: "r1", p_resolution: "insults", p_hold: "banned" }]);
+    expect(mockedRpc.mock.calls[0].slice(1)).toEqual([
+      "admin_close_report",
+      { p_report: "r1", p_resolution: "insults", p_hold: "banned", p_category: "harassment", p_details: null },
+    ]);
+  });
+
+  it("closes a report without a hold, telling nobody", async () => {
+    mockedRpc.mockResolvedValueOnce(null);
+    await post({ intent: "report", report: "r1", user: "u1", resolution: "nothing found", hold: "" });
+    expect(mockedRpc.mock.calls[0].slice(1)).toEqual([
+      "admin_close_report",
+      { p_report: "r1", p_resolution: "nothing found", p_hold: null },
+    ]);
+  });
+
+  it("refuses a hold without its reason category, before calling the database", async () => {
+    const forms: Record<string, string>[] = [
+      { intent: "report", report: "r1", user: "u1", resolution: "insults", hold: "review" },
+      { intent: "hold", user: "u1", state: "banned", reason: "fake photos" },
+      { intent: "media", media: "m1", approved: "false" },
+      { intent: "delete-message", match: "x", message: "m", user: "u1", reason: "insult" },
+    ];
+    for (const fields of forms) {
+      const answer = await post(fields);
+      expect(answer.init?.status).toBe(400);
+      expect(answer.data).toEqual({ ok: false, error: "Choose the reason they're told." });
+    }
+    expect(mockedRpc).not.toHaveBeenCalled();
+  });
+
+  it("puts a hold with its statement, and lifts one without", async () => {
+    mockedRpc.mockResolvedValue(null);
+    await post({
+      intent: "hold",
+      user: "u1",
+      state: "selfie",
+      reason: "stolen photos?",
+      category: "identity_check",
+      details: "Merci d'envoyer un selfie.",
+    });
+    await post({ intent: "hold", user: "u1", state: "", reason: "selfie matches the photos", category: "hate" });
+    expect(mockedRpc.mock.calls.map((c) => c.slice(1))).toEqual([
+      [
+        "admin_set_hold",
+        {
+          p_user: "u1",
+          p_state: "selfie",
+          p_reason: "stolen photos?",
+          p_category: "identity_check",
+          p_details: "Merci d'envoyer un selfie.",
+        },
+      ],
+      ["admin_set_hold", { p_user: "u1", p_state: null, p_reason: "selfie matches the photos" }],
+    ]);
+  });
+
+  it("explains an unknown category: nothing was applied", async () => {
+    mockedRpc.mockRejectedValueOnce(new DbError("unknown reason category", "invalid_category", 400));
+    const answer = await post({ intent: "hold", user: "u1", state: "review", reason: "x", category: "made_up" });
+    expect(answer.data).toEqual({ ok: false, error: "Unknown reason category: nothing was applied. Reload the page and choose again." });
   });
 
   it("says a report already closed is gone, with a 4xx", async () => {
     mockedRpc.mockRejectedValueOnce(new DbError("no open report", "not_found", 400));
-    const answer = await post({ intent: "report", report: "r1", user: "u1", resolution: "again", hold: "banned" });
+    const answer = await post({ intent: "report", report: "r1", user: "u1", resolution: "again", hold: "banned", category: "harassment" });
     expect(answer.init?.status).toBe(400);
     expect(answer.data).toEqual({ ok: false, error: "It's gone, or already handled." });
   });
@@ -108,6 +200,46 @@ describe("act", () => {
     const answer = await post({ intent: "batch", ops: "[]" });
     expect(answer.init?.status).toBe(400);
     expect(mockedRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("message deletion", () => {
+  it("logs it with the author's statement and the conversation's override, then deletes it", async () => {
+    const { deleteMessage } = await import("~/lib/.server/stream");
+    mockedRpc.mockResolvedValueOnce(null);
+    const answer = await post({
+      intent: "delete-message",
+      match: "match-1",
+      message: "msg-9",
+      user: "u1",
+      reason: "threat",
+      override: "true",
+      category: "harassment",
+      details: "",
+    });
+    expect(mockedRpc.mock.calls[0].slice(1)).toEqual([
+      "admin_log",
+      {
+        p_action: "message.delete",
+        p_user: "u1",
+        p_target: "match-1/msg-9",
+        p_reason: "threat",
+        p_override: true,
+        p_category: "harassment",
+        p_details: null,
+      },
+    ]);
+    expect(deleteMessage).toHaveBeenCalledWith("msg-9");
+    expect(answer.data.ok).toBe(true);
+  });
+
+  it("deletes nothing when the conversation has no basis", async () => {
+    const { deleteMessage } = await import("~/lib/.server/stream");
+    vi.mocked(deleteMessage).mockClear();
+    mockedRpc.mockRejectedValueOnce(new DbError("no basis", "no_basis", 400));
+    const answer = await post({ intent: "delete-message", match: "m", message: "x", user: "u1", reason: "r", category: "hate" });
+    expect(answer.data.ok).toBe(false);
+    expect(deleteMessage).not.toHaveBeenCalled();
   });
 });
 

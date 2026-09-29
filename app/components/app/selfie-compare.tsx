@@ -9,6 +9,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
 import { Kbd } from "~/components/ui/kbd";
 import { cn } from "~/lib/utils";
+import { suggestedCategory } from "~/lib/reasons";
 import type { Person } from "~/lib/types";
 import { ActButton, ReasonDialog } from "./act";
 import { OverlayBadge, PersonLink, TimeAgo } from "./bits";
@@ -190,6 +191,7 @@ export function SelfieCompare({
               intent="hold"
               fields={{ user: item.person.id, state: "banned" }}
               destructive
+              statement={{}}
               title={`Ban ${name}?`}
               description="The selfie isn't the person in the photos. Their email, phone and sign-ins can't come back."
               submit="Ban"
@@ -203,6 +205,7 @@ export function SelfieCompare({
             <ReasonDialog
               intent="hold"
               fields={{ user: item.person.id, state: "selfie" }}
+              statement={{ category: suggestedCategory("selfie") }}
               title="Ask for another selfie"
               description="Their account stays frozen until they send a new one."
               placeholder="Blurry, face hidden, not the front camera"

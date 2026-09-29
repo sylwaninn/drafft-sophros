@@ -16,7 +16,8 @@ import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
-import type { Report } from "~/lib/types";
+import { suggestedCategory } from "~/lib/reasons";
+import type { Hold, Report } from "~/lib/types";
 import type { Route } from "./+types/reports";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -184,9 +185,11 @@ function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: (
                     </Select>
                   </Field>
                   <ReasonDialog
-                    key={ban ? "ban" : "close"}
+                    key={hold}
                     intent="report"
                     fields={{ report: r.id, user: r.reported.id, hold: hold === "none" ? "" : hold }}
+                    // A hold is told to them with its reason; closing alone tells nobody.
+                    statement={hold === "none" ? undefined : { category: suggestedCategory(hold as Hold) }}
                     reasonName="resolution"
                     label="Resolution"
                     placeholder="What you found and did"
@@ -194,8 +197,10 @@ function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: (
                     title={ban ? `Ban ${r.reported.name ?? "this account"} and close the report` : "Close the report"}
                     description={
                       ban
-                        ? "The ban applies at once: the account closes for good, and its email, phone and sign-ins can't come back. The resolution goes to the audit log."
-                        : "The resolution goes to the audit log; the hold, if any, applies at once."
+                        ? "The ban applies at once: the account closes for good, and its email, phone and sign-ins can't come back. They're told why."
+                        : hold === "none"
+                          ? "The resolution goes to the audit log. Nobody is told."
+                          : "The hold applies at once, and they're told why. The resolution goes to the audit log."
                     }
                     submit={ban ? "Ban and close" : "Close the report"}
                     trigger={
