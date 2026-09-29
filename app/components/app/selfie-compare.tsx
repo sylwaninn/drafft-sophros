@@ -1,16 +1,21 @@
 // The selfie check, one case at a time: the selfie on the left, the profile's photos on the right, one
 // at a time at the same size. ← and → go through the photos; the three decisions sit underneath.
 import { useCallback, useState } from "react";
+import { useFetcher, type FetcherWithComponents } from "react-router";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
-import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, ShieldBanIcon, UserRoundCheckIcon } from "lucide-react";
+import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon, ShieldBanIcon, UserRoundCheckIcon } from "lucide-react";
 import { AspectRatio } from "~/components/ui/aspect-ratio";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
+import { Field, FieldDescription, FieldError, FieldLabel } from "~/components/ui/field";
 import { Kbd } from "~/components/ui/kbd";
+import { Spinner } from "~/components/ui/spinner";
+import { Textarea } from "~/components/ui/textarea";
 import { cn } from "~/lib/utils";
 import { suggestedCategory } from "~/lib/reasons";
 import type { Person } from "~/lib/types";
+import type { SelfieResult } from "~/routes/selfie-data";
 import { ActButton, ReasonDialog } from "./act";
 import { OverlayBadge, PersonLink, TimeAgo } from "./bits";
 import { PhotoViewer, useArrowKeys } from "./photo-viewer";
@@ -27,18 +32,21 @@ const ease = [0.16, 1, 0.3, 1] as const;
 
 export function SelfieCompare({
   item,
-  selfie,
   position,
   total,
   canDecide,
 }: {
   item: SelfieCaseData;
-  selfie: string | null;
   position: number;
   total: number;
   canDecide: boolean;
 }) {
   const url = useMediaUrl();
+  // The selfie opens for a reason typed here, logged (selfie-data); the case is keyed by person, so the
+  // next one starts closed.
+  const reveal = useFetcher<SelfieResult>();
+  const shown = reveal.data?.ok && reveal.data.user === item.person.id ? reveal.data : null;
+  const selfie = shown?.url ?? null;
   const [at, setAt] = useState(0);
   const [direction, setDirection] = useState(1);
   const [viewer, setViewer] = useState<"selfie" | "photo" | null>(null);
@@ -91,12 +99,18 @@ export function SelfieCompare({
                       className="size-full object-cover"
                     />
                   </button>
+                ) : shown ? (
+                  <div className="flex size-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                    The selfie file is missing.
+                  </div>
+                ) : canDecide ? (
+                  <SelfieGate user={item.person.id} fetcher={reveal} />
                 ) : (
                   <div className="flex size-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                    {canDecide ? "The selfie file is missing." : "Selfies are shown to moderators."}
+                    Selfies are shown to moderators.
                   </div>
                 )}
-                <OverlayBadge>Front camera</OverlayBadge>
+                {selfie && <OverlayBadge>Front camera</OverlayBadge>}
               </AspectRatio>
             </figure>
             <figure className="space-y-2">
@@ -241,5 +255,51 @@ export function SelfieCompare({
         title={`${name}'s photos`}
       />
     </MotionConfig>
+  );
+}
+
+/** Opening a selfie: the reason is typed each time, and goes to the audit log with the viewing. */
+function SelfieGate({ user, fetcher }: { user: string; fetcher: FetcherWithComponents<SelfieResult> }) {
+  const [reason, setReason] = useState("");
+  const pending = fetcher.state !== "idle";
+  const refused = fetcher.data && !fetcher.data.ok ? fetcher.data.error : null;
+  return (
+    <fetcher.Form
+      method="post"
+      action="/selfie-data"
+      // Nothing else on the page changes: no reload, and no other read logged.
+      defaultShouldRevalidate={false}
+      className="flex size-full flex-col justify-center gap-4 p-5"
+    >
+      <input type="hidden" name="user" value={user} />
+      <Field data-invalid={refused ? true : undefined}>
+        <FieldLabel htmlFor={`selfie-reason-${user}`}>Why you're opening it</FieldLabel>
+        <Textarea
+          id={`selfie-reason-${user}`}
+          name="reason"
+          required
+          rows={3}
+          maxLength={1000}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Comparing it with the profile photos"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
+        />
+        {refused ? (
+          <FieldError>{refused}</FieldError>
+        ) : (
+          <FieldDescription>Saved with your email in the audit log. The link lasts 5 minutes.</FieldDescription>
+        )}
+      </Field>
+      <Button type="submit" disabled={pending || !reason.trim()}>
+        {pending ? <Spinner data-icon="inline-start" /> : <EyeIcon data-icon="inline-start" />}
+        Show the selfie
+      </Button>
+    </fetcher.Form>
   );
 }

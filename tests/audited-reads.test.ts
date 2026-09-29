@@ -1,8 +1,10 @@
-// Pages whose loaders log a sensitive read: they run only for a read that happens.
+// Sensitive reads: an account page's loader runs only for a read that happens, and a selfie opens only
+// for a reason typed by the person.
 // `cloudflare:workers` and `fetch` are stubbed: no network.
 import { RouterContextProvider } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { revalidateOnNewRead, selfieCaseShown } from "~/lib/audited-reads";
+import { revalidateOnNewRead } from "~/lib/audited-reads";
+import { staffContext } from "~/lib/context";
 
 vi.mock("cloudflare:workers", () => ({
   env: {
@@ -38,18 +40,6 @@ describe("account revalidation", () => {
   });
 });
 
-describe("verifications revalidation", () => {
-  const should = revalidateOnNewRead(selfieCaseShown);
-  it("doesn't reload for tabs without a selfie", () => {
-    expect(should(nav("/verifications", "/verifications?tab=reviews"))).toBe(false);
-    expect(should(nav("/verifications?tab=reviews", "/verifications?tab=owed"))).toBe(false);
-  });
-  it("loads the selfie of the case that comes to the front", () => {
-    expect(should(nav("/verifications?tab=reviews", "/verifications"))).toBe(true);
-    expect(should(nav("/verifications", "/verifications?case=b"))).toBe(true);
-  });
-});
-
 describe("verifications loader", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -60,50 +50,78 @@ describe("verifications loader", () => {
     waitingSelfie: [],
   };
 
-  async function load(path: string, role = "moderator") {
-    const calls: { path: string; args: Record<string, unknown> }[] = [];
-    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
-      const u = new URL(input instanceof Request ? input.url : String(input));
-      calls.push({ path: u.pathname, args: JSON.parse(String(init?.body ?? "{}")) });
-      if (u.pathname.endsWith("/admin_verifications")) return Response.json(queue);
-      if (u.pathname.endsWith("/admin_selfies")) return Response.json([{ path: "s.jpg", createdAt: "" }]);
-      if (u.pathname.startsWith("/storage/v1/object/sign/")) return Response.json({ signedURL: "/object/sign/s.jpg?token=t" });
-      return new Response("no network in tests", { status: 599 });
-    });
+  it("reads the queue and no selfie: each opens for a reason typed on the case", async () => {
+    const calls = stubDatabase({ admin_verifications: queue });
     const { loader } = await import("~/routes/verifications");
-    const { staffContext } = await import("~/lib/context");
-    const context = new RouterContextProvider();
-    context.set(staffContext, { email: "mod@test.dev", role: role as "moderator" });
-    const data = await loader({ request: new Request(url(path)), context, params: {} } as unknown as Parameters<typeof loader>[0]);
-    return { data, calls };
-  }
-
-  it("signs and logs the case in front only", async () => {
-    const { data, calls } = await load("/verifications");
-    expect(calls.map((c) => c.path.split("/").slice(0, 5).join("/"))).toEqual([
-      "/rest/v1/rpc/admin_verifications",
-      "/rest/v1/rpc/admin_selfies",
-      "/storage/v1/object/sign",
-    ]);
-    expect(calls[1].args.p_user).toBe("u0");
-    expect(data.selfie?.user).toBe("u0");
-  });
-
-  it("follows the picked case", async () => {
-    const { data, calls } = await load("/verifications?case=u7");
-    expect(calls[1].args.p_user).toBe("u7");
-    expect(data.selfie?.user).toBe("u7");
-  });
-
-  it("reads no selfie on the other tabs, nor for support", async () => {
-    for (const [path, role] of [
-      ["/verifications?tab=reviews", "moderator"],
-      ["/verifications?tab=owed", "moderator"],
-      ["/verifications", "support"],
-    ]) {
-      const { data, calls } = await load(path, role);
-      expect(calls.map((c) => c.path)).toEqual(["/rest/v1/rpc/admin_verifications"]);
-      expect(data.selfie).toBeNull();
-    }
+    const data = await loader({
+      request: new Request(url("/verifications?case=u7")),
+      context: staffAs("moderator"),
+      params: {},
+    } as unknown as Parameters<typeof loader>[0]);
+    expect(calls.map((c) => c.path)).toEqual(["/rest/v1/rpc/admin_verifications"]);
+    expect(data).toEqual({ queue });
   });
 });
+
+describe("selfie-data", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  async function open(fields: Record<string, string>, answer: unknown = [{ path: "s.jpg", createdAt: "" }]) {
+    const calls = stubDatabase({ admin_selfies: answer });
+    const { action } = await import("~/routes/selfie-data");
+    const request = new Request(url("/selfie-data"), { method: "POST", body: new URLSearchParams(fields) });
+    const result = (await action({ request, context: staffAs("moderator"), params: {} } as unknown as Parameters<
+      typeof action
+    >[0])) as unknown as {
+      data: unknown;
+      init: { status?: number } | null;
+    };
+    return { calls, result };
+  }
+
+  it("logs the viewing with the reason typed, then signs the latest selfie", async () => {
+    const { calls, result } = await open({ user: "u7", reason: "  comparing with photo 2  " });
+    expect(calls.map((c) => c.path.split("/").slice(0, 5).join("/"))).toEqual(["/rest/v1/rpc/admin_selfies", "/storage/v1/object/sign"]);
+    expect(calls[0].args).toEqual({ p_user: "u7", p_reason: "comparing with photo 2", p_actor: "mod@test.dev" });
+    expect(result.data).toEqual({ ok: true, user: "u7", url: "https://db.test/storage/v1/object/sign/s.jpg?token=t" });
+  });
+
+  it("opens nothing without a reason of the person's own", async () => {
+    for (const reason of ["", "   ", "Opened in sophros"]) {
+      const { calls, result } = await open({ user: "u7", reason });
+      expect(calls).toEqual([]);
+      expect(result.init?.status).toBe(400);
+      expect(result.data).toMatchObject({ ok: false });
+    }
+  });
+
+  it("explains a refusal from the database", async () => {
+    const { result } = await open({ user: "u7", reason: "checking" }, { status: 400, hint: "forbidden" });
+    expect(result.data).toEqual({ ok: false, error: "Your role doesn't allow this." });
+  });
+});
+
+/** Answers PostgREST calls by function name (`{ status, hint }`: a refusal) and signs any object. */
+function stubDatabase(answers: Record<string, unknown>) {
+  const calls: { path: string; args: Record<string, unknown> }[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    const u = new URL(input instanceof Request ? input.url : String(input));
+    calls.push({ path: u.pathname, args: JSON.parse(String(init?.body ?? "{}")) });
+    const fn = u.pathname.split("/rpc/")[1];
+    if (fn && fn in answers) {
+      const answer = answers[fn] as { status?: number; hint?: string };
+      if (answer && typeof answer === "object" && "hint" in answer)
+        return Response.json({ message: "refused", hint: answer.hint }, { status: answer.status ?? 400 });
+      return Response.json(answer);
+    }
+    if (u.pathname.startsWith("/storage/v1/object/sign/")) return Response.json({ signedURL: "/object/sign/s.jpg?token=t" });
+    return new Response("no network in tests", { status: 599 });
+  });
+  return calls;
+}
+
+function staffAs(role: "support" | "moderator" | "admin") {
+  const context = new RouterContextProvider();
+  context.set(staffContext, { email: role === "admin" ? "admin@test.dev" : "mod@test.dev", role });
+  return context;
+}
