@@ -102,7 +102,21 @@ export interface SupportRequest {
   handled_at: string | null;
   handled_by: string | null;
   person: Person | null;
-  replies: { id: number; author: string; body: string; createdAt: string; sentAt: string | null; error: string | null }[];
+  /** The thread under the first message, oldest first: the team's replies and the member's emails. */
+  replies: SupportMessage[];
+}
+
+export interface SupportMessage {
+  id: number;
+  /** The staff member, or the member's address for a message received by email. */
+  author: string;
+  body: string;
+  createdAt: string;
+  /** Sent by email (a reply), or received (the member's email). */
+  sentAt: string | null;
+  error: string | null;
+  /** "out": the team's reply; "in": the member's email. Missing on a backend that doesn't file emails yet. */
+  direction?: "in" | "out";
 }
 
 export interface DataRequest {
