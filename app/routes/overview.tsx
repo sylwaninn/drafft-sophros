@@ -14,7 +14,7 @@ const queues: { key: keyof ReturnType<typeof useRoot>["queues"]; to: string; tit
   { key: "reviews", to: "/verifications?tab=reviews", title: "Accounts in review", what: "Held automatically or by the team." },
   { key: "flags", to: "/shared-media", title: "Shared media", what: "Photos sent in chats that the silent check flagged." },
   { key: "photos", to: "/profile-photos", title: "Profile photos", what: "Borderline, second looks, and ones refused on their own." },
-  { key: "support", to: "/support", title: "Support requests", what: "Messages from the app's help forms." },
+  { key: "support", to: "/support", title: "Support requests", what: "Messages from the app's help forms and the support address." },
   { key: "exports", to: "/support?tab=exports", title: "Data exports", what: "Send each person their data, then mark it sent." },
   { key: "selfieOwed", to: "/verifications?tab=owed", title: "Selfies owed", what: "Asked, not sent yet. Nothing to do." },
 ];

@@ -85,7 +85,7 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
     <Page>
       <PageHeader
         title="Support"
-        description="Messages from the app's help forms, and data exports to send. Open a request to reply: the email leaves from here, in their language."
+        description="Messages from the app's help forms and the support address, and data exports to send. Open a request to reply: the email leaves from here, in their language."
         actions={
           <ToggleGroup
             type="single"
@@ -379,7 +379,8 @@ function Thread({ request: r }: { request: SupportRequest }) {
               }}
             />
             <FieldDescription>
-              Emailed to {r.email} with the reference, framed in their language. Their answer by email comes back to this thread.
+              Emailed to {r.email} with the reference, framed in their language. If they answer this email from the same address, it comes
+              back to this thread.
             </FieldDescription>
           </Field>
         </fetcher.Form>
