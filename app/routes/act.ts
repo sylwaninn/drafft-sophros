@@ -5,13 +5,13 @@ import { data } from "react-router";
 import { staffContext } from "~/lib/context";
 import { DbError, rpc } from "~/lib/.server/db";
 import { deleteMessage } from "~/lib/.server/stream";
-import { deletionReference } from "~/lib/deletion";
-import type { Hold } from "~/lib/types";
+import { deletedMessage, deletionReference } from "~/lib/deletion";
+import type { DeleteAccountResult, Hold } from "~/lib/types";
 import type { Route } from "./+types/act";
 
 export type ActResult = { ok: true; message?: string } | { ok: false; error: string };
 
-const errors: Record<string, string> = {
+const errors = {
   forbidden: "Your role doesn't allow this.",
   reason_required: "Say why: the reason goes to the audit log.",
   not_found: "It's gone, or already handled.",
@@ -21,9 +21,15 @@ const errors: Record<string, string> = {
   one_account: "These flags belong to more than one account.",
   invalid_ids: "Choose between 1 and 200 events.",
   invalid_reference: "Give the support reference (DR-XXXXXX), or email.",
+  unknown_reference: "No support request has this reference.",
   already_deleted: "This account is deleted already.",
   already_requested: "A deletion of this account is already on its way.",
-};
+} satisfies Record<string, string>;
+
+/** The text for a database refusal's code, else its own message. */
+function refusal(error: DbError): string {
+  return Object.hasOwn(errors, error.code) ? errors[error.code as keyof typeof errors] : error.message;
+}
 
 const holds = new Set<unknown>(["review", "selfie", "banned"]);
 
@@ -114,21 +120,16 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
       case "delete-account": {
         // At the member's request, admins only (the database checks). The backend deletes it a moment later,
-        // exactly as the app's own deletion would, and emails the member a confirmation.
+        // exactly as the app's own deletion would, and emails the confirmation (or tells the team when there's
+        // no address to write to).
         const reference = deletionReference(text("reference"));
         if (!reference) return result({ ok: false, error: errors.invalid_reference }, 400);
-        const queued = await rpc<{ expected: "erase" | "keep" }>(staff, "admin_delete_account", {
+        const queued = await rpc<DeleteAccountResult>(staff, "admin_delete_account", {
           p_user: text("user"),
           p_reason: text("reason"),
           p_reference: reference,
         });
-        return result({
-          ok: true,
-          message:
-            queued.expected === "erase"
-              ? "Deletion on its way: the account will be erased, and the member told by email."
-              : "Deletion on its way: the account will be kept for members' safety, and the member told by email.",
-        });
+        return result({ ok: true, message: deletedMessage(queued) });
       }
       case "data-request":
         await rpc(staff, "admin_fulfil_data_request", { p_id: Number(text("id")) });
@@ -157,8 +158,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         return result({ ok: false, error: `Unknown action ${intent}` }, 400);
     }
   } catch (error) {
-    if (error instanceof DbError)
-      return result({ ok: false, error: errors[error.code] ?? error.message }, error.status === 403 ? 403 : 400);
+    if (error instanceof DbError) return result({ ok: false, error: refusal(error) }, error.status === 403 ? 403 : 400);
     console.error(`act ${intent}`, error);
     return result({ ok: false, error: error instanceof Error ? error.message : "Something went wrong." }, 500);
   }

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   CheckIcon,
@@ -21,6 +21,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
@@ -56,25 +57,23 @@ import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
 import { revalidateOnNewRead } from "~/lib/audited-reads";
-import { confirmationTo, deletionOutcome } from "~/lib/deletion";
-import type { AccountDeletion, AuditEntry, DeletionPreview, UserDetail } from "~/lib/types";
+import { deletionCheck } from "~/lib/.server/deletion";
+import { confirmationTo, deletionAvailability, deletionOutcome, deletionPrefill, deletionReference } from "~/lib/deletion";
+import type { AccountDeletion, AuditEntry, DeletionCheck, UserDetail } from "~/lib/types";
 import { reasons } from "./reports";
 import type { Route } from "./+types/account";
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ request, params, context }: Route.LoaderArgs) {
   const staff = context.get(staffContext);
-  const [user, audit, deletion, deletionPreview] = await Promise.all([
+  const [user, audit, deletion, deletionState] = await Promise.all([
     query<UserDetail>(staff, "admin_user", { p_user: params.id }),
     can(staff, "moderator") ? query<AuditEntry[]>(staff, "admin_audit", { p_user: params.id, p_limit: 50 }) : Promise.resolve(null),
     // Null unless the owner deleted the account and it was kept (reported, held or banned).
     query<AccountDeletion | null>(staff, "admin_account_deletion", { p_user: params.id }),
-    // Admins only: what deleting it at the member's request would do. Null when the backend can't say (an
-    // older backend, an account gone).
-    can(staff, "admin")
-      ? query<DeletionPreview>(staff, "admin_account_deletion_preview", { p_user: params.id }).catch(() => null)
-      : Promise.resolve(null),
+    // Admins only: what deleting it at the member's request would do (with the request opened from, if any).
+    deletionCheck(staff, params.id, new URL(request.url).searchParams.get("delete")),
   ]);
-  return { user, audit, deletion, deletionPreview };
+  return { user, audit, deletion, deletionState };
 }
 
 // Another tab shows the same account: it isn't read (nor logged as opened) again.
@@ -140,7 +139,7 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   );
 }
 
-export default function Account({ loaderData: { user: u, audit, deletion, deletionPreview } }: Route.ComponentProps) {
+export default function Account({ loaderData: { user: u, audit, deletion, deletionState } }: Route.ComponentProps) {
   const { staff } = useRoot();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -184,7 +183,7 @@ export default function Account({ loaderData: { user: u, audit, deletion, deleti
             </Button>
           )}
           <HoldControls user={p.id} name={p.name} current={p.moderation} />
-          <MoreMenu u={u} moderator={moderator} preview={deletionPreview} />
+          <MoreMenu key={p.id} u={u} moderator={moderator} check={deletionState} />
         </div>
       </div>
 
@@ -291,12 +290,18 @@ export default function Account({ loaderData: { user: u, audit, deletion, deleti
   );
 }
 
-function MoreMenu({ u, moderator, preview }: { u: UserDetail; moderator: boolean; preview: DeletionPreview | null }) {
+function MoreMenu({ u, moderator, check }: { u: UserDetail; moderator: boolean; check: DeletionCheck }) {
   const [revoking, setRevoking] = useState(false);
   // Opened from a support request (its "Delete this account"): the dialog opens with that request's reference.
   const [params] = useSearchParams();
-  const [deleting, setDeleting] = useState(() => params.has("delete"));
-  const canDelete = !!preview && !preview.deleted;
+  const prefill = deletionPrefill(params);
+  const available = deletionAvailability(check);
+  const [deleting, setDeleting] = useState(() => prefill.open && available.ok);
+  // Opened from a support request but the account can't be deleted now: say why, once, rather than nothing.
+  const [blocked] = useState(() => (prefill.open && !available.ok ? available.why : null));
+  useEffect(() => {
+    if (blocked) toast.warning(blocked, { id: "deletion-blocked" });
+  }, [blocked]);
   return (
     <>
       <DropdownMenu>
@@ -330,13 +335,16 @@ function MoreMenu({ u, moderator, preview }: { u: UserDetail; moderator: boolean
               </DropdownMenuItem>
             </>
           )}
-          {canDelete && (
+          {check && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
+              <DropdownMenuItem variant="destructive" disabled={!available.ok} onSelect={() => setDeleting(true)}>
                 <UserXIcon />
                 Delete account at the member's request
               </DropdownMenuItem>
+              {!available.ok && available.why && (
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{available.why}</DropdownMenuLabel>
+              )}
             </>
           )}
         </DropdownMenuContent>
@@ -352,25 +360,24 @@ function MoreMenu({ u, moderator, preview }: { u: UserDetail; moderator: boolean
           onOpenChange={setRevoking}
         />
       )}
-      {canDelete && (
+      {available.ok && (
         <ReasonDialog
           intent="delete-account"
           fields={{ user: u.profile.id }}
           title="Delete account at the member's request"
-          description="Only when the member asked: from the account's email address, or with its phone number, confirmed."
+          description="Only when the member asked: from the account's email address, or from another address giving its phone number, and then confirmed it was them."
           placeholder="How they asked and how you checked it was them"
-          submit={preview.outcome === "erase" ? "Delete and erase" : "Delete and keep for safety"}
+          submit={available.preview.outcome === "erased" ? "Delete and erase" : "Delete and keep for safety"}
           destructive
           open={deleting}
           onOpenChange={setDeleting}
         >
-          <Alert variant={preview.outcome === "erase" ? "destructive" : "default"}>
+          <Alert variant={available.preview.outcome === "erased" ? "destructive" : "default"}>
             <UserXIcon />
-            <AlertTitle>{preview.outcome === "erase" ? "It will be erased" : "It will be kept for safety"}</AlertTitle>
+            <AlertTitle>{available.preview.outcome === "erased" ? "It will be erased" : "It will be kept for safety"}</AlertTitle>
             <AlertDescription>
-              <p>{deletionOutcome(preview)}</p>
-              <p>Confirmation to {confirmationTo(preview)}.</p>
-              {preview.pending && <p>A deletion is already on its way.</p>}
+              <p>{deletionOutcome(available.preview)}</p>
+              <p>Confirmation to {confirmationTo(available.preview, !!deletionReference(prefill.reference)?.startsWith("DR-"))}.</p>
             </AlertDescription>
           </Alert>
           <Field>
@@ -380,7 +387,7 @@ function MoreMenu({ u, moderator, preview }: { u: UserDetail; moderator: boolean
               name="reference"
               required
               maxLength={20}
-              defaultValue={params.get("delete") || "email"}
+              defaultValue={prefill.reference}
               placeholder="DR-XXXXXX, or email"
             />
             <FieldDescription>The support reference, or email for a message outside the support requests.</FieldDescription>

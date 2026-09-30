@@ -162,17 +162,34 @@ export interface Device {
   last_seen_at: string;
 }
 
-/** Why an account deleted by its owner was kept (admin_account_deletion). */
-/** Before deleting an account at the member's request (admin_account_deletion_preview). */
-export interface DeletionPreview {
-  outcome: "erase" | "keep";
-  basis: "ban" | "hold" | "report" | null;
-  deleted: boolean;
-  /** A deletion is already on its way. */
-  pending: boolean;
-  email: string | null;
+/** Why a deleted account is kept for members' safety: banned, held, or under an open report. */
+export type RetentionBasis = "ban" | "hold" | "report";
+
+/** What deleting an account does: erased, or kept for members' safety (a soft delete). */
+export type DeletionOutcome = "erased" | "kept";
+
+/** Where the member's confirmation goes. `emailed` false: no address at all, the team is told instead. */
+export interface DeletionConfirmation {
+  emails: string[];
+  emailed: boolean;
 }
 
+/** Before deleting an account at the member's request, ready to confirm: the outcome expected now. */
+export type ReadyDeletion = DeletionConfirmation &
+  ({ status: "ready"; outcome: "erased" } | { status: "ready"; outcome: "kept"; basis: RetentionBasis });
+
+/** Before deleting an account at the member's request (admin_account_deletion_preview). */
+export type DeletionPreview = { status: "deleted" } | { status: "pending" } | ReadyDeletion;
+
+/** A deletion queued at the member's request (admin_delete_account): decided again when it runs. */
+export interface DeleteAccountResult extends DeletionConfirmation {
+  expected: DeletionOutcome;
+}
+
+/** The deletion preview as the account page gets it: null for staff below admin. */
+export type DeletionCheck = { ok: true; preview: DeletionPreview } | { ok: false; error: string } | null;
+
+/** Why an account deleted by its owner was kept (admin_account_deletion). */
 export interface AccountDeletion {
   deletedAt: string;
   basis: "ban" | "hold" | "report";
