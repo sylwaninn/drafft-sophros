@@ -118,19 +118,21 @@ function DeletionPanel({ deletion: d }: { deletion: AccountDeletion }) {
           ["Legal basis", "Members' safety"],
           ...deletionIdentityRows(d).map(([label, value]): [string, React.ReactNode] => [
             label,
-            Array.isArray(value) ? (
-              <ul className="space-y-0.5">
-                {value.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            ) : (
-              value
-            ),
+            Array.isArray(value) ? <Lines lines={value} /> : value,
           ]),
         ]}
       />
     </Panel>
+  );
+}
+
+function Lines({ lines }: { lines: string[] }) {
+  return (
+    <ul className="space-y-0.5">
+      {lines.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+    </ul>
   );
 }
 

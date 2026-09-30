@@ -2,13 +2,14 @@
 // drafft-backend #49): which kinds existed and each Apple or Google sign-in's dates, never an identity in
 // clear; `{}` once the retention purge cleared it.
 import { formatDate } from "~/components/app/format";
-import type { AccountDeletion, DeletionOAuthSignIn } from "~/lib/types";
+import type { AccountDeletion, DeletionIdentities, DeletionOAuthSignIn } from "~/lib/types";
 
-export type DeletionIdentitiesView =
-  { purged: true; purgedAt: string | null } | { purged: false; email: boolean; phone: boolean; oauth: DeletionOAuthSignIn[] };
+type DeletionRecord = Pick<AccountDeletion, "identities" | "identitiesPurgedAt">;
+
+export type DeletionIdentitiesView = { purged: true; purgedAt: string | null } | ({ purged: false } & DeletionIdentities);
 
 /** Purged when the record says so, or when the summary is gone (`{}`). */
-export function deletionIdentities(d: Pick<AccountDeletion, "identities" | "identitiesPurgedAt">): DeletionIdentitiesView {
+export function deletionIdentities(d: DeletionRecord): DeletionIdentitiesView {
   const ids = d.identities;
   if (d.identitiesPurgedAt || !("email" in ids)) return { purged: true, purgedAt: d.identitiesPurgedAt ?? null };
   return { purged: false, email: Boolean(ids.email), phone: Boolean(ids.phone), oauth: Array.isArray(ids.oauth) ? ids.oauth : [] };
@@ -32,7 +33,7 @@ export function oauthSignInLine(o: DeletionOAuthSignIn) {
 }
 
 /** The rows of the "Deleted by the person" panel about sign-in identities. */
-export function deletionIdentityRows(d: Pick<AccountDeletion, "identities" | "identitiesPurgedAt">): [string, string | string[] | null][] {
+export function deletionIdentityRows(d: DeletionRecord): [string, string | string[] | null][] {
   const v = deletionIdentities(d);
   if (v.purged) return [["Sign-in then", v.purgedAt ? `Purged on ${formatDate(v.purgedAt)}` : "Purged"]];
   return [
