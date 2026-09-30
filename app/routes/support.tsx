@@ -1,6 +1,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Form, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
-import { ArrowRightIcon, CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  DownloadIcon,
+  LifeBuoyIcon,
+  MailCheckIcon,
+  MailIcon,
+  RotateCcwIcon,
+  SearchIcon,
+  SendIcon,
+} from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -21,6 +31,7 @@ import { ActButton, useAct } from "~/components/app/act";
 import { Facts, Id, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
+import { fromMember, memberWroteLast, replySending, teamReplies } from "~/lib/support";
 import type { DataRequest, SupportRequest } from "~/lib/types";
 import type { Route } from "./+types/support";
 
@@ -143,10 +154,17 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
                         {s.person ? <PersonLink person={s.person} /> : <span className="text-muted-foreground">{s.email}</span>}
                       </TableCell>
                       <TableCell className="max-w-80 truncate text-muted-foreground">
-                        {s.replies.length > 0 && (
-                          <Badge variant="outline" className="mr-2">
-                            {s.replies.length} repl{s.replies.length === 1 ? "y" : "ies"}
+                        {memberWroteLast(s) ? (
+                          <Badge className="mr-2">
+                            <MailIcon data-icon="inline-start" />
+                            Answered by email
                           </Badge>
+                        ) : (
+                          teamReplies(s).length > 0 && (
+                            <Badge variant="outline" className="mr-2">
+                              {teamReplies(s).length} repl{teamReplies(s).length === 1 ? "y" : "ies"}
+                            </Badge>
+                          )
                         )}
                         {s.message}
                       </TableCell>
@@ -220,7 +238,8 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
   );
 }
 
-/** A request, the team's replies under it, and the reply box: sent by email from the backend. */
+/** A request, its thread (the team's replies, the member's answers by email) and the reply box: sent by email from
+ * the backend. */
 function Thread({ request: r }: { request: SupportRequest }) {
   const form = useRef<HTMLFormElement>(null);
   const formId = useId();
@@ -241,7 +260,7 @@ function Thread({ request: r }: { request: SupportRequest }) {
   });
   // A reply is emailed by the backend a moment later: check back until it's sent.
   const revalidator = useRevalidator();
-  const sending = r.replies.some((m) => !m.sentAt && !m.error);
+  const sending = replySending(r);
   useEffect(() => {
     if (!sending) return;
     const t = setInterval(() => revalidator.state === "idle" && revalidator.revalidate(), 3000);
@@ -274,29 +293,44 @@ function Thread({ request: r }: { request: SupportRequest }) {
                 <ItemTitle className="font-normal whitespace-pre-wrap">{r.message}</ItemTitle>
               </ItemContent>
             </Item>
-            {r.replies.map((m) => (
-              <Item key={m.id} variant="outline" className="ml-8 items-start">
-                <ItemContent>
-                  <ItemDescription className="flex flex-wrap items-center gap-1.5">
-                    {m.author}, <TimeAgo value={m.createdAt} />
-                    {m.error ? (
-                      <Badge variant="destructive">Not sent, retrying</Badge>
-                    ) : m.sentAt ? (
+            {r.replies.map((m) =>
+              fromMember(m) ? (
+                <Item key={m.id} variant="muted" className="items-start">
+                  <ItemContent>
+                    <ItemDescription className="flex flex-wrap items-center gap-1.5">
+                      {r.person?.name || m.author}, <TimeAgo value={m.createdAt} />
                       <Badge variant="secondary">
-                        <MailCheckIcon data-icon="inline-start" />
-                        Sent
+                        <MailIcon data-icon="inline-start" />
+                        By email
                       </Badge>
-                    ) : (
-                      <Badge variant="outline">
-                        <Spinner data-icon="inline-start" />
-                        Sending
-                      </Badge>
-                    )}
-                  </ItemDescription>
-                  <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
-                </ItemContent>
-              </Item>
-            ))}
+                    </ItemDescription>
+                    <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
+                  </ItemContent>
+                </Item>
+              ) : (
+                <Item key={m.id} variant="outline" className="ml-8 items-start">
+                  <ItemContent>
+                    <ItemDescription className="flex flex-wrap items-center gap-1.5">
+                      {m.author}, <TimeAgo value={m.createdAt} />
+                      {m.error ? (
+                        <Badge variant="destructive">Not sent, retrying</Badge>
+                      ) : m.sentAt ? (
+                        <Badge variant="secondary">
+                          <MailCheckIcon data-icon="inline-start" />
+                          Sent
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">
+                          <Spinner data-icon="inline-start" />
+                          Sending
+                        </Badge>
+                      )}
+                    </ItemDescription>
+                    <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
+                  </ItemContent>
+                </Item>
+              ),
+            )}
           </ItemGroup>
         </div>
       </ScrollArea>
@@ -328,7 +362,7 @@ function Thread({ request: r }: { request: SupportRequest }) {
               }}
             />
             <FieldDescription>
-              Emailed to {r.email} with the reference, framed in their language. Their answer reaches the support inbox.
+              Emailed to {r.email} with the reference, framed in their language. Their answer by email comes back to this thread.
             </FieldDescription>
           </Field>
         </fetcher.Form>
