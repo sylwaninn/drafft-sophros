@@ -1,7 +1,8 @@
 // A match's conversation in a drawer. It opens on why it may be read (its basis: a report, a help
 // request, a hold) and a reason the person types; only then are the messages read, the reading logged on
 // both accounts' trail with the reason and where it was opened from (conversation-data). Without a
-// basis, only an admin reads it, as an override confirmed apart.
+// basis, only an admin reads it, as an override confirmed apart with why (a legal request or members'
+// safety).
 import { useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible";
 import { Field, FieldDescription, FieldError, FieldLabel } from "~/components/ui/field";
+import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "~/components/ui/item";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "~/components/ui/sheet";
@@ -29,10 +31,11 @@ import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
 import type { ChatMessage } from "~/lib/.server/stream";
-import { basisLabels, type ConversationAccess } from "~/lib/reasons";
+import { olderMessages } from "~/lib/older-messages";
+import { basisLabels, isOverrideBasis, overrideBases, READ_REASON_MAX, type ConversationAccess, type OverrideBasis } from "~/lib/reasons";
 import type { Person } from "~/lib/types";
 import { cn } from "~/lib/utils";
-import type { ConversationGate, ConversationRead } from "~/routes/conversation-data";
+import type { ConversationGate, ConversationPage, ConversationRead } from "~/routes/conversation-data";
 import { ReasonDialog } from "./act";
 import { Nothing, PersonAvatar, PersonLink, TimeAgo } from "./bits";
 import { formatDate } from "./format";
@@ -52,9 +55,11 @@ export function ConversationDrawer({ matchId, from, onClose }: { matchId: string
 function Conversation({ matchId, from }: { matchId: string; from: string }) {
   const gate = useFetcher<ConversationGate>();
   const reading = useFetcher<ConversationRead>();
+  // Typed here, not in the gate: a refused reading gives the gate back with the reason still in it.
+  const [reason, setReason] = useState("");
   // What the reading was asked with: the older pages are asked (and logged) with it too.
-  const [asked, setAsked] = useState<{ reason: string; override: boolean } | null>(null);
-  const [older, setOlder] = useState<{ messages: ChatMessage[]; hasMore: boolean } | null>(null);
+  const [asked, setAsked] = useState<Asked | null>(null);
+  const [older, setOlder] = useState<ConversationPage | null>(null);
   // Deleted from here: shown as deleted at once, without reading the conversation again.
   const [deleted, setDeleted] = useState<ReadonlySet<string>>(new Set());
 
@@ -63,18 +68,30 @@ function Conversation({ matchId, from }: { matchId: string; from: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per match: the component is keyed by it
   }, []);
 
+  // No basis any more (a hold lifted, a request closed since the drawer opened): the basis shown is
+  // stale, so it's asked again, with the override an admin may now need.
+  useEffect(() => {
+    if (reading.state === "idle" && reading.data && !reading.data.ok && reading.data.code === "no_basis") {
+      gate.load(`/conversation-data/${matchId}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on each answer only
+  }, [reading.state, reading.data]);
+
   const info = gate.data?.match.id === matchId ? gate.data : undefined;
   const read = reading.data?.ok ? reading.data : undefined;
   const refusal = reading.data && !reading.data.ok ? reading.data : undefined;
-  const messages = read?.messages ? [...(older?.messages ?? []), ...read.messages.messages] : [];
-  const hasMore = older ? older.hasMore : (read?.messages?.hasMore ?? false);
+  const page = read?.messages ?? null;
+  const messages = page ? [...(older?.messages ?? []), ...page.messages] : [];
+  const hasMore = older ? older.hasMore : (page?.hasMore ?? false);
   const people: Record<string, Person> = info ? { [info.match.a.id]: info.match.a, [info.match.b.id]: info.match.b } : {};
 
-  const open = (reason: string, override: boolean) => {
-    setAsked({ reason, override });
+  const open = (override: OverrideBasis | null) => {
+    const typed = reason.trim();
+    if (!typed) return;
+    setAsked({ reason: typed, overrideBasis: override });
     // Nothing else on the page reloads: no other read is logged.
     reading.submit(
-      { reason, from, override: String(override) },
+      { reason: typed, from, override: String(override !== null), override_basis: override ?? "" },
       { method: "post", action: `/conversation-data/${matchId}`, defaultShouldRevalidate: false },
     );
   };
@@ -90,17 +107,20 @@ function Conversation({ matchId, from }: { matchId: string; from: string }) {
         body: new URLSearchParams({
           reason: asked.reason,
           from: `${from}, older messages`,
-          override: String(asked.override),
+          override: String(asked.overrideBasis !== null),
+          override_basis: asked.overrideBasis ?? "",
           before: messages[0].id,
         }),
       });
-      const page = (await res.json()) as ConversationRead;
-      if (!page.ok) return void toast.error(page.error);
+      const answer = await olderMessages(res);
+      if (!answer.ok) return void toast.error(answer.error);
       setOlder((o) => ({
-        messages: [...(page.messages?.messages ?? []), ...(o?.messages ?? [])],
-        hasMore: page.messages?.hasMore ?? false,
+        exists: true,
+        messages: [...answer.page.messages, ...(o?.messages ?? [])],
+        hasMore: answer.page.hasMore,
       }));
-    } catch {
+    } catch (error) {
+      console.error("older messages", error);
       toast.error("The older messages couldn't be read.");
     } finally {
       setLoadingOlder(false);
@@ -136,7 +156,7 @@ function Conversation({ matchId, from }: { matchId: string; from: string }) {
             "Loading"
           )}
         </SheetDescription>
-        {info && <BasisBadges access={info.access} override={read ? asked?.override : false} />}
+        {info && <BasisBadges access={info.access} override={read ? (asked?.overrideBasis ?? null) : null} />}
         {info && info.match.sessions.length > 0 && (
           <Collapsible>
             <CollapsibleTrigger asChild>
@@ -170,20 +190,28 @@ function Conversation({ matchId, from }: { matchId: string; from: string }) {
       </SheetHeader>
       <ScrollArea className="min-h-0 flex-1">
         <div className="p-4">
-          {!info || reading.state !== "idle" ? (
+          {!info ? (
             <div className="space-y-3">
               {[0, 1, 2, 3].map((i) => (
                 <Skeleton key={i} className={cn("h-12 w-2/3 rounded-2xl", i % 2 && "ml-auto")} />
               ))}
             </div>
           ) : !read ? (
-            <ReadGate access={info.access} refusal={refusal?.error ?? null} onOpen={open} />
-          ) : read.error ? (
+            // Stays mounted while the reading is asked: a refusal gives it back as it was typed.
+            <ReadGate
+              access={info.access}
+              refusal={reading.state === "idle" ? (refusal?.error ?? null) : null}
+              pending={reading.state !== "idle"}
+              reason={reason}
+              onReason={setReason}
+              onOpen={open}
+            />
+          ) : !read.messages ? (
             <Alert variant="destructive">
               <AlertTitle>Stream couldn't be read</AlertTitle>
-              <AlertDescription>{read.error}</AlertDescription>
+              <AlertDescription>{read.streamError}</AlertDescription>
             </Alert>
-          ) : !read.messages?.exists ? (
+          ) : !read.messages.exists ? (
             <Nothing title="Nobody wrote yet">The chat channel is created with the first message.</Nothing>
           ) : messages.length === 0 ? (
             <Nothing title="No message" />
@@ -205,7 +233,7 @@ function Conversation({ matchId, from }: { matchId: string; from: string }) {
                     author={people[m.user?.id ?? ""]}
                     left={m.user?.id === info.match.a.id}
                     matchId={info.match.id}
-                    override={asked?.override ?? false}
+                    overrideBasis={asked?.overrideBasis ?? null}
                     deletedHere={deleted.has(m.id)}
                     onDeleted={() => setDeleted((d) => new Set(d).add(m.id))}
                   />
@@ -219,12 +247,20 @@ function Conversation({ matchId, from }: { matchId: string; from: string }) {
   );
 }
 
+/** What a reading was asked with: the reason, and why an admin read it without a basis (null: it had one). */
+interface Asked {
+  reason: string;
+  overrideBasis: OverrideBasis | null;
+}
+
 /** Why the team may read it, as the database sees it; or the override it was opened with. */
-function BasisBadges({ access, override }: { access: ConversationAccess; override?: boolean }) {
+function BasisBadges({ access, override }: { access: ConversationAccess; override: OverrideBasis | null }) {
   if (access.basis.length === 0) {
     return (
       <div className="flex flex-wrap gap-1.5">
-        <Badge variant={override ? "destructive" : "outline"}>{override ? "Read as an admin override" : "No basis"}</Badge>
+        <Badge variant={override ? "destructive" : "outline"}>
+          {override ? `Read as an admin override: ${overrideBases[override].title.toLowerCase()}` : "No basis"}
+        </Badge>
       </div>
     );
   }
@@ -234,10 +270,10 @@ function BasisBadges({ access, override }: { access: ConversationAccess; overrid
         <Tooltip key={b}>
           <TooltipTrigger asChild>
             <Badge variant="secondary" tabIndex={0}>
-              {basisLabels[b]?.title ?? b}
+              {basisLabels[b].title}
             </Badge>
           </TooltipTrigger>
-          <TooltipContent>{basisLabels[b]?.description ?? b}</TooltipContent>
+          <TooltipContent>{basisLabels[b].description}</TooltipContent>
         </Tooltip>
       ))}
     </div>
@@ -246,24 +282,31 @@ function BasisBadges({ access, override }: { access: ConversationAccess; overrid
 
 /**
  * Before any message: the reason, typed by the person, for the audit log. Without a basis (no report,
- * help request or hold), a moderator can't read it; an admin can, as an override confirmed apart.
+ * help request or hold), a moderator can't read it; an admin can, as an override confirmed apart, saying
+ * why: a legal request or members' safety.
  */
 function ReadGate({
   access,
   refusal,
+  pending,
+  reason,
+  onReason,
   onOpen,
 }: {
   access: ConversationAccess;
   refusal: string | null;
-  onOpen: (reason: string, override: boolean) => void;
+  pending: boolean;
+  reason: string;
+  onReason: (reason: string) => void;
+  onOpen: (override: OverrideBasis | null) => void;
 }) {
-  const [reason, setReason] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [overrideBasis, setOverrideBasis] = useState<OverrideBasis | null>(null);
   const typed = reason.trim();
   const basis = access.basis.length > 0;
   const submit = () => {
-    if (!typed) return;
-    if (basis) onOpen(typed, false);
+    if (!typed || pending) return;
+    if (basis) onOpen(null);
     else if (access.canOverride) setConfirming(true);
   };
   return (
@@ -276,7 +319,7 @@ function ReadGate({
             <p>Members are told the team reads a chat only for a report, a help request or a risk to their safety. This one has a basis:</p>
             <ul className="mt-1 list-disc pl-4">
               {access.basis.map((b) => (
-                <li key={b}>{basisLabels[b]?.description ?? b}</li>
+                <li key={b}>{basisLabels[b].description}</li>
               ))}
             </ul>
           </AlertDescription>
@@ -286,9 +329,9 @@ function ReadGate({
           <ShieldAlertIcon />
           <AlertTitle>No basis to read it</AlertTitle>
           <AlertDescription>
-            No report between them, no help request from either in the last 90 days, and neither account is on hold.{" "}
+            No report between them, no help request from either in the last 90 days, and neither account is on hold by someone else.{" "}
             {access.canOverride
-              ? "As an admin you can still read it, for a risk to members' safety: it's logged as an override."
+              ? "As an admin you can still read it, for a legal request or members' safety: it's logged as an override."
               : "Only an admin can read it, as an override."}
           </AlertDescription>
         </Alert>
@@ -307,10 +350,10 @@ function ReadGate({
               id="conversation-reason"
               required
               rows={3}
-              maxLength={1000}
+              maxLength={READ_REASON_MAX}
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={basis ? "Checking the insults the report describes" : "What puts members at risk"}
+              onChange={(e) => onReason(e.target.value)}
+              placeholder={basis ? "Checking the insults the report describes" : "What the request or the risk is"}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
@@ -324,8 +367,14 @@ function ReadGate({
               <FieldDescription>Saved with your email on both accounts' trail, with where you opened it from.</FieldDescription>
             )}
           </Field>
-          <Button type="submit" variant={basis ? "default" : "destructive"} disabled={!typed} className="w-fit">
-            {basis ? <MessagesSquareIcon data-icon="inline-start" /> : <ShieldAlertIcon data-icon="inline-start" />}
+          <Button type="submit" variant={basis ? "default" : "destructive"} disabled={!typed || pending} className="w-fit">
+            {pending ? (
+              <Spinner data-icon="inline-start" />
+            ) : basis ? (
+              <MessagesSquareIcon data-icon="inline-start" />
+            ) : (
+              <ShieldAlertIcon data-icon="inline-start" />
+            )}
             {basis ? "Read the conversation" : "Read without a basis"}
           </Button>
         </form>
@@ -335,12 +384,30 @@ function ReadGate({
           <AlertDialogHeader>
             <AlertDialogTitle>Read it without a basis?</AlertDialogTitle>
             <AlertDialogDescription>
-              Nothing on record allows it. It's logged on both accounts as an admin override, with your reason: “{typed}”.
+              Nothing on record allows it. It's logged on both accounts as an admin override, with why and your reason: “{typed}”.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <Field>
+            <FieldLabel id="override-basis-label">Why without a basis</FieldLabel>
+            <RadioGroup
+              aria-labelledby="override-basis-label"
+              value={overrideBasis ?? ""}
+              onValueChange={(value) => setOverrideBasis(isOverrideBasis(value) ? value : null)}
+            >
+              {(Object.keys(overrideBases) as OverrideBasis[]).map((b) => (
+                <Field key={b} orientation="horizontal">
+                  <RadioGroupItem value={b} id={`override-${b}`} />
+                  <FieldLabel htmlFor={`override-${b}`} className="font-normal">
+                    <span className="font-medium">{overrideBases[b].title}</span>
+                    <span className="text-muted-foreground">{overrideBases[b].description}</span>
+                  </FieldLabel>
+                </Field>
+              ))}
+            </RadioGroup>
+          </Field>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => onOpen(typed, true)}>
+            <AlertDialogAction variant="destructive" disabled={!overrideBasis} onClick={() => overrideBasis && onOpen(overrideBasis)}>
               Read it anyway
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -418,7 +485,7 @@ function Bubble({
   author,
   left,
   matchId,
-  override,
+  overrideBasis,
   deletedHere,
   onDeleted,
 }: {
@@ -426,8 +493,8 @@ function Bubble({
   author?: Person;
   left: boolean;
   matchId: string;
-  /** Opened as an admin override: deleting a message in it is one too. */
-  override: boolean;
+  /** Opened as an admin override (and why): deleting a message in it is one too. */
+  overrideBasis: OverrideBasis | null;
   deletedHere: boolean;
   onDeleted: () => void;
 }) {
@@ -477,7 +544,13 @@ function Bubble({
           {!deleted && (
             <ReasonDialog
               intent="delete-message"
-              fields={{ match: matchId, message: m.id, user: m.user.id, override: override ? "true" : "" }}
+              fields={{
+                match: matchId,
+                message: m.id,
+                user: m.user.id,
+                override: overrideBasis ? "true" : "",
+                override_basis: overrideBasis ?? "",
+              }}
               destructive
               statement={{}}
               onDone={onDeleted}

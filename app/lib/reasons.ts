@@ -4,10 +4,13 @@
 // the audit log stays internal. Shared by the pages and the Worker: nothing server-only here.
 import type { Hold } from "./types";
 
+/** The part of the terms a category falls under: its anchor on getdrafft.com/terms (null: the terms as a whole). */
+export type TermsAnchor = "community" | "eligibility" | "moderation";
+
 /** A category as admin_reason_categories returns it. */
 export interface ReasonCategory {
   id: string;
-  termsSection: string;
+  termsAnchor: TermsAnchor | null;
 }
 
 /** What the member is told with a decision: the category, and the team's note if any. */
@@ -16,8 +19,29 @@ export interface Statement {
   details?: string;
 }
 
-/** The note for the member: sent as written, at most this long (the database refuses more). */
+/** A statement as sent: the category chosen, and the note if any. */
+export interface Told {
+  category: string;
+  details?: string;
+}
+
+/** The note for the member: sent as written, at most this long (sophros and the database refuse more, never cut it). */
 export const DETAILS_MAX = 1000;
+
+/** Any reason written for the audit log: the database's limit (admin_audit.reason). */
+export const REASON_MAX = 1000;
+
+/** A report's resolution when it holds the account: the hold's reason repeats it after "report: ". */
+export const RESOLUTION_MAX = REASON_MAX - "report: ".length;
+
+/** The part of `from` (where a conversation was opened from) that goes into the logged reason. */
+export const FROM_MAX = 200;
+
+/**
+ * A reason typed to read a conversation: shorter, since the logged reason also says where it was opened
+ * from (`auditedReason`), and the whole must fit REASON_MAX.
+ */
+export const READ_REASON_MAX = REASON_MAX - FROM_MAX - " (opened from )".length;
 
 const labels: Record<string, string> = {
   harassment: "Harassment, threats or insults",
@@ -37,22 +61,37 @@ const labels: Record<string, string> = {
 
 /** A category as staff read it; one added in the database before sophros knows it shows its id. */
 export function categoryLabel(id: string): string {
-  return labels[id] ?? id.replaceAll("_", " ");
+  return Object.hasOwn(labels, id) ? labels[id] : id.replaceAll("_", " ");
 }
 
 const TERMS_URL = "https://getdrafft.com/terms";
 
-const sections: Record<string, { label: string; anchor: string }> = {
-  community_guidelines: { label: "Community guidelines", anchor: "#community" },
-  to_use_drafft: { label: "To use drafft", anchor: "#eligibility" },
-  moderation_and_sanctions: { label: "Moderation and sanctions", anchor: "#moderation" },
-  terms_of_use: { label: "Terms of use", anchor: "" },
+const anchors: Record<TermsAnchor, string> = {
+  community: "Community guidelines",
+  eligibility: "To use drafft",
+  moderation: "Moderation and sanctions",
 };
 
-/** The part of the terms a category applies, with its link on getdrafft.com. */
-export function termsSection(section: string): { label: string; url: string } {
-  const known = sections[section];
-  return known ? { label: known.label, url: TERMS_URL + known.anchor } : { label: "Terms of use", url: TERMS_URL };
+function isAnchor(value: unknown): value is TermsAnchor {
+  return typeof value === "string" && Object.hasOwn(anchors, value);
+}
+
+/** The part of the terms a category falls under, with its link on getdrafft.com; the whole terms for null. */
+export function termsLink(anchor: TermsAnchor | null): { label: string; url: string } {
+  return anchor ? { label: anchors[anchor], url: `${TERMS_URL}#${anchor}` } : { label: "Terms of use", url: TERMS_URL };
+}
+
+/**
+ * admin_reason_categories' answer, checked: the categories with an id; an anchor sophros doesn't know
+ * reads as the whole terms. Empty for anything else (the forms then say to reload).
+ */
+export function reasonCategories(value: unknown): ReasonCategory[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((c: unknown) => {
+    if (!c || typeof c !== "object") return [];
+    const { id, termsAnchor } = c as { id?: unknown; termsAnchor?: unknown };
+    return typeof id === "string" && id ? [{ id, termsAnchor: isAnchor(termsAnchor) ? termsAnchor : null }] : [];
+  });
 }
 
 /** The category a decision suggests on its own, preselected but open to change: none for a ban. */
@@ -62,17 +101,35 @@ export function suggestedCategory(decision: Hold | "photo"): string | undefined 
   return undefined;
 }
 
+/**
+ * Filled in: a category among the ones the database offers (so none when they couldn't be read, nor a
+ * preselected one it doesn't have), and a note that fits.
+ */
+export function statementReady(value: Statement, categories: readonly ReasonCategory[]): boolean {
+  return categories.some((c) => c.id === value.category) && (value.details ?? "").trim().length <= DETAILS_MAX;
+}
+
 /** The dashboard's old default reason for opening a conversation, refused by the database. */
 const placeholderReasons = new Set(["opened in sophros"]);
 
 /**
  * A reason written by the person for reading something private (a conversation, a selfie): trimmed,
- * at most 1,000 characters, and never empty or the old default. Null when there isn't one.
+ * at most `max` characters, and never empty or the old default. Null when there isn't one.
  */
-export function typedReason(value: unknown): string | null {
+export function typedReason(value: unknown, max = REASON_MAX): string | null {
   if (typeof value !== "string") return null;
-  const reason = value.trim().slice(0, 1000);
+  const reason = value.trim().slice(0, max).trim();
   return reason && !placeholderReasons.has(reason.toLowerCase()) ? reason : null;
+}
+
+/**
+ * The reason logged for reading a conversation: the person's, then where it was opened from, the whole
+ * within REASON_MAX (the reason is cut, never the place), so the database never refuses it for its length.
+ */
+export function auditedReason(reason: string, from: string): string {
+  const place = from.trim().slice(0, FROM_MAX);
+  const suffix = place ? ` (opened from ${place})` : "";
+  return `${reason.slice(0, REASON_MAX - suffix.length).trimEnd()}${suffix}`;
 }
 
 /** Why the team may read a conversation, as admin_conversation_access names it. */
@@ -87,5 +144,27 @@ export interface ConversationAccess {
 export const basisLabels: Record<Basis, { title: string; description: string }> = {
   report: { title: "Report", description: "One of them reported the other." },
   support: { title: "Help request", description: "One of them wrote to support, still open or in the last 90 days." },
-  hold: { title: "Hold", description: "One of them is on hold or banned." },
+  hold: { title: "Hold", description: "One of them is on hold or banned, and someone other than you put it." },
 };
+
+function isBasis(value: unknown): value is Basis {
+  return typeof value === "string" && Object.hasOwn(basisLabels, value);
+}
+
+/** admin_conversation_access' answer, checked: known bases only, and an override only when it says `true`. */
+export function conversationAccess(value: unknown): ConversationAccess {
+  const { basis, canOverride } = (value && typeof value === "object" ? value : {}) as { basis?: unknown; canOverride?: unknown };
+  return { basis: Array.isArray(basis) ? basis.filter(isBasis) : [], canOverride: canOverride === true };
+}
+
+/** Why an admin reads a conversation without a basis: the only two the database accepts. */
+export type OverrideBasis = "legal_request" | "member_safety";
+
+export const overrideBases: Record<OverrideBasis, { title: string; description: string }> = {
+  legal_request: { title: "Legal request", description: "A court, the police or another authority asked for it." },
+  member_safety: { title: "Members' safety", description: "Someone may be at risk, and nothing on record covers it yet." },
+};
+
+export function isOverrideBasis(value: unknown): value is OverrideBasis {
+  return typeof value === "string" && Object.hasOwn(overrideBases, value);
+}

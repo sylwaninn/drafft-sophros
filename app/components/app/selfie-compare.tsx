@@ -13,7 +13,7 @@ import { Kbd } from "~/components/ui/kbd";
 import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
 import { cn } from "~/lib/utils";
-import { suggestedCategory } from "~/lib/reasons";
+import { REASON_MAX, suggestedCategory } from "~/lib/reasons";
 import type { Person } from "~/lib/types";
 import type { SelfieResult } from "~/routes/selfie-data";
 import { ActButton, ReasonDialog } from "./act";
@@ -279,7 +279,7 @@ function SelfieGate({ user, fetcher }: { user: string; fetcher: FetcherWithCompo
           name="reason"
           required
           rows={3}
-          maxLength={1000}
+          maxLength={REASON_MAX}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Comparing it with the profile photos"

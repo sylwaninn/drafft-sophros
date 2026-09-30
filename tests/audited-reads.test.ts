@@ -66,8 +66,8 @@ describe("verifications loader", () => {
 describe("selfie-data", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  async function open(fields: Record<string, string>, answer: unknown = [{ path: "s.jpg", createdAt: "" }]) {
-    const calls = stubDatabase({ admin_selfies: answer });
+  async function open(fields: Record<string, string>, answer: unknown = [{ path: "s.jpg", createdAt: "" }], signs = true) {
+    const calls = stubDatabase({ admin_selfies: answer }, signs);
     const { action } = await import("~/routes/selfie-data");
     const request = new Request(url("/selfie-data"), { method: "POST", body: new URLSearchParams(fields) });
     const result = (await action({ request, context: staffAs("moderator"), params: {} } as unknown as Parameters<
@@ -95,14 +95,29 @@ describe("selfie-data", () => {
     }
   });
 
+  it("says there is no selfie, without signing anything", async () => {
+    const { calls, result } = await open({ user: "u7", reason: "checking" }, []);
+    expect(calls.map((c) => c.path)).toEqual(["/rest/v1/rpc/admin_selfies"]);
+    expect(result.data).toEqual({ ok: true, user: "u7", url: null });
+  });
+
+  it("says Storage failed, rather than a missing selfie, and logs it", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { result } = await open({ user: "u7", reason: "checking" }, undefined, false);
+    expect(result.init?.status).toBe(502);
+    expect(result.data).toEqual({ ok: false, error: "The selfie link couldn't be made. Try again." });
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
   it("explains a refusal from the database", async () => {
     const { result } = await open({ user: "u7", reason: "checking" }, { status: 400, hint: "forbidden" });
     expect(result.data).toEqual({ ok: false, error: "Your role doesn't allow this." });
   });
 });
 
-/** Answers PostgREST calls by function name (`{ status, hint }`: a refusal) and signs any object. */
-function stubDatabase(answers: Record<string, unknown>) {
+/** Answers PostgREST calls by function name (`{ status, hint }`: a refusal) and signs any object (or fails to). */
+function stubDatabase(answers: Record<string, unknown>, signs = true) {
   const calls: { path: string; args: Record<string, unknown> }[] = [];
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     const u = new URL(input instanceof Request ? input.url : String(input));
@@ -114,7 +129,8 @@ function stubDatabase(answers: Record<string, unknown>) {
         return Response.json({ message: "refused", hint: answer.hint }, { status: answer.status ?? 400 });
       return Response.json(answer);
     }
-    if (u.pathname.startsWith("/storage/v1/object/sign/")) return Response.json({ signedURL: "/object/sign/s.jpg?token=t" });
+    if (u.pathname.startsWith("/storage/v1/object/sign/"))
+      return signs ? Response.json({ signedURL: "/object/sign/s.jpg?token=t" }) : new Response("unavailable", { status: 503 });
     return new Response("no network in tests", { status: 599 });
   });
   return calls;

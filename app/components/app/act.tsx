@@ -34,16 +34,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "~/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "~/components/ui/field";
 import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
 import { can } from "~/lib/roles";
-import { suggestedCategory, type Statement } from "~/lib/reasons";
+import { REASON_MAX, suggestedCategory, type Statement } from "~/lib/reasons";
 import type { Hold } from "~/lib/types";
 import type { ActResult } from "~/routes/act";
 import { useRoot } from "./root-data";
-import { StatementFields, statementReady } from "./statement-fields";
+import { StatementFields, useStatementReady } from "./statement-fields";
 
 type Fields = Record<string, string | number | null | undefined | (string | number)[]>;
 
@@ -99,6 +99,7 @@ export function ActButton({
  * dialog instead (bans, deletions). `statement`: the member is told this decision and why, so the
  * dialog also asks for the reason category they're told (preselected when `statement.category` is
  * given) and a note for them; the reason typed here then stays internal. Extra inputs go in `children`.
+ * A refusal keeps the dialog open with what was typed, and says why in it.
  */
 export function ReasonDialog({
   intent,
@@ -112,6 +113,7 @@ export function ReasonDialog({
   defaultReason = "",
   required = true,
   reasonName = "reason",
+  maxLength = REASON_MAX,
   statement,
   open,
   onOpenChange,
@@ -130,6 +132,8 @@ export function ReasonDialog({
   defaultReason?: string;
   required?: boolean;
   reasonName?: string;
+  /** The reason's length limit, when the database adds to it. */
+  maxLength?: number;
   statement?: { category?: string };
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -161,6 +165,7 @@ export function ReasonDialog({
       defaultReason={defaultReason}
       required={required}
       reasonName={reasonName}
+      maxLength={maxLength}
       statement={statement}
     >
       {children}
@@ -210,6 +215,7 @@ function ReasonForm({
   defaultReason,
   required,
   reasonName,
+  maxLength,
   statement,
   children,
 }: {
@@ -223,11 +229,17 @@ function ReasonForm({
   defaultReason: string;
   required: boolean;
   reasonName: string;
+  maxLength: number;
   statement?: { category?: string };
   children?: ReactNode;
 }) {
   const [told, setTold] = useState<Statement>({ category: statement?.category });
-  const ready = !statement || statementReady(told);
+  const toldReady = useStatementReady(told);
+  const ready = !statement || toldReady;
+  // The last refusal since this opening, shown in the dialog (it stays open), until the next try.
+  const [before] = useState(fetcher.data);
+  const answer = fetcher.state === "idle" && fetcher.data !== before ? fetcher.data : undefined;
+  const refused = answer && !answer.ok ? answer.error : null;
   return (
     <fetcher.Form method="post" action="/act" defaultShouldRevalidate className="grid gap-6">
       <Hidden intent={intent} fields={fields} />
@@ -240,7 +252,7 @@ function ReasonForm({
             id={`${intent}-${reasonName}`}
             name={reasonName}
             required={required}
-            maxLength={1000}
+            maxLength={maxLength}
             rows={3}
             defaultValue={defaultReason}
             placeholder={placeholder}
@@ -251,6 +263,7 @@ function ReasonForm({
             </FieldDescription>
           )}
         </Field>
+        {refused && <FieldError>{refused}</FieldError>}
       </FieldGroup>
       {destructive ? (
         <AlertDialogFooter>

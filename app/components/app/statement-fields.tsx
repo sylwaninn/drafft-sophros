@@ -5,12 +5,12 @@ import { ExternalLinkIcon } from "lucide-react";
 import { Field, FieldDescription, FieldError, FieldLabel } from "~/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
-import { categoryLabel, DETAILS_MAX, termsSection, type Statement } from "~/lib/reasons";
+import { categoryLabel, DETAILS_MAX, statementReady, termsLink, type Statement } from "~/lib/reasons";
 import { useRoot } from "./root-data";
 
-/** Filled in: a category chosen, and a note that fits. */
-export function statementReady(value: Statement): boolean {
-  return Boolean(value.category) && (value.details ?? "").trim().length <= DETAILS_MAX;
+/** Whether a statement can be sent: its category is one the database lists (statementReady). */
+export function useStatementReady(value: Statement): boolean {
+  return statementReady(value, useRoot().reasonCategories);
 }
 
 /**
@@ -20,7 +20,7 @@ export function statementReady(value: Statement): boolean {
 export function StatementFields({ id, value, onChange }: { id: string; value: Statement; onChange: (value: Statement) => void }) {
   const { reasonCategories } = useRoot();
   const chosen = reasonCategories.find((c) => c.id === value.category);
-  const terms = chosen ? termsSection(chosen.termsSection) : null;
+  const terms = chosen ? termsLink(chosen.termsAnchor) : null;
   const details = value.details ?? "";
   return (
     <>

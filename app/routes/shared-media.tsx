@@ -6,11 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { Facts, MediaTile, Nothing, OverlayBadge, Page, PageHeader, Panel, PersonLink, TimeAgo } from "~/components/app/bits";
 import { AccountPanel, ReviewStage, type AccountBrief } from "~/components/app/review-parts";
-import { ReviewQueue, type ReviewAction } from "~/components/app/review-queue";
+import { ReviewQueue, toldIn, type ReviewAction } from "~/components/app/review-queue";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import { suggestedCategory } from "~/lib/reasons";
-import type { Flag as FlagRow, Person } from "~/lib/types";
+import { holdChanges, type Flag as FlagRow, type Hold, type Person } from "~/lib/types";
 import type { Route } from "./+types/shared-media";
 
 interface Flag extends FlagRow {
@@ -37,7 +37,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 const why = (f: Flag) => `photo shared in a chat: ${f.labels.join(", ")}`;
-const holdable = (f: Flag) => !!f.person && !f.person.deleted && f.person.moderation !== "banned";
+// A hold the account already has would tell them nothing new: that choice isn't offered.
+const holdable = (state: Hold) => (f: Flag) => !!f.person && !f.person.deleted && holdChanges(f.person.moderation, state);
 
 const actions: ReviewAction<Flag>[] = [
   {
@@ -54,7 +55,7 @@ const actions: ReviewAction<Flag>[] = [
     key: "h",
     label: "Hold for review",
     icon: ShieldQuestionIcon,
-    available: holdable,
+    available: holdable("review"),
     prompt: {
       title: (f) => `Hold ${f.person?.name || "this account"} for review?`,
       description: "Freezes the account until someone clears it. They're told why.",
@@ -62,14 +63,13 @@ const actions: ReviewAction<Flag>[] = [
     statement: {},
     reason: why,
     done: "Account held for review.",
-    decide: (f, { reason, category, details }) => ({
+    decide: (f, answer) => ({
       intent: "flags",
       ids: [f.id],
       reason: "account held for review",
       hold: "review",
-      holdReason: reason,
-      category,
-      details,
+      holdReason: answer.reason,
+      ...toldIn(answer),
     }),
   },
   {
@@ -77,7 +77,7 @@ const actions: ReviewAction<Flag>[] = [
     key: "s",
     label: "Ask for a selfie",
     icon: ScanFaceIcon,
-    available: holdable,
+    available: holdable("selfie"),
     prompt: {
       title: (f) => `Ask ${f.person?.name || "this account"} for a selfie?`,
       description: "Freezes the account until they send a selfie. They're told why.",
@@ -85,14 +85,13 @@ const actions: ReviewAction<Flag>[] = [
     statement: { category: suggestedCategory("selfie") },
     reason: why,
     done: "Selfie asked: the account is frozen until they send it.",
-    decide: (f, { reason, category, details }) => ({
+    decide: (f, answer) => ({
       intent: "flags",
       ids: [f.id],
       reason: "selfie asked",
       hold: "selfie",
-      holdReason: reason,
-      category,
-      details,
+      holdReason: answer.reason,
+      ...toldIn(answer),
     }),
   },
   {
@@ -101,7 +100,7 @@ const actions: ReviewAction<Flag>[] = [
     label: "Ban",
     icon: ShieldBanIcon,
     variant: "destructive",
-    available: holdable,
+    available: holdable("banned"),
     prompt: {
       title: (f) => `Ban ${f.person?.name || "this account"}?`,
       description: "Closes the account for good: its email, phone and sign-ins can't come back.",
@@ -109,14 +108,13 @@ const actions: ReviewAction<Flag>[] = [
     },
     statement: {},
     done: "Account banned.",
-    decide: (f, { reason, category, details }) => ({
+    decide: (f, answer) => ({
       intent: "flags",
       ids: [f.id],
       reason: "account banned",
       hold: "banned",
-      holdReason: reason,
-      category,
-      details,
+      holdReason: answer.reason,
+      ...toldIn(answer),
     }),
   },
 ];

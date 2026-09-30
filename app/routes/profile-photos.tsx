@@ -2,13 +2,13 @@ import { CheckIcon, ShieldBanIcon, ShieldQuestionIcon, UndoIcon, XIcon } from "l
 import { Badge } from "~/components/ui/badge";
 import { Facts, OverlayBadge, Page, PageHeader, Panel, TimeAgo } from "~/components/app/bits";
 import { AccountPanel, ReviewStage, type AccountBrief } from "~/components/app/review-parts";
-import { ReviewQueue, type ReviewAction } from "~/components/app/review-queue";
+import { ReviewQueue, toldIn, type ReviewAction } from "~/components/app/review-queue";
 import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
 import { suggestedCategory } from "~/lib/reasons";
-import type { Person } from "~/lib/types";
+import { holdChanges, type Hold, type Person } from "~/lib/types";
 import type { Route } from "./+types/profile-photos";
 
 interface ProfilePhoto {
@@ -34,7 +34,8 @@ export async function loader({ context }: Route.LoaderArgs) {
 const labels = (m: ProfilePhoto) => (m.labels?.length ? m.labels.join(", ") : "no label");
 const pending = (m: ProfilePhoto) => m.state === "pending";
 const refused = (m: ProfilePhoto) => m.state === "refused";
-const holdable = (m: ProfilePhoto) => m.person.moderation !== "banned";
+// A hold the account already has would tell them nothing new: that choice isn't offered.
+const holdable = (state: Hold) => (m: ProfilePhoto) => holdChanges(m.person.moderation, state);
 const actions: ReviewAction<ProfilePhoto>[] = [
   {
     id: "approve",
@@ -59,7 +60,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     statement: { category: suggestedCategory("photo") },
     reason: (m) => `profile photo refused: ${labels(m)}`,
     done: "Photo refused: they're told why and can ask for a second look.",
-    decide: (m, { reason, category, details }) => ({ intent: "media", media: m.id, approved: false, reason, category, details }),
+    decide: (m, answer) => ({ intent: "media", media: m.id, approved: false, reason: answer.reason, ...toldIn(answer) }),
   },
   {
     id: "keep",
@@ -85,7 +86,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     key: "h",
     label: "Refuse and hold the account",
     icon: ShieldQuestionIcon,
-    available: holdable,
+    available: holdable("review"),
     prompt: {
       title: (m) => `Refuse the photo and hold ${m.person.name || "this account"}?`,
       description: "The photo stays hidden and the account is frozen until someone clears it. They're told why.",
@@ -94,7 +95,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     reason: (m) => `profile photo refused: ${labels(m)}`,
     done: "Photo refused, account held for review.",
     // A pending photo is refused with the account decision; an already refused one has its flags closed.
-    decide: (m, { reason, category, details }) => ({ intent: "photo", media: m.id, reason, hold: "review", category, details }),
+    decide: (m, answer) => ({ intent: "photo", media: m.id, reason: answer.reason, hold: "review", ...toldIn(answer) }),
   },
   {
     id: "ban",
@@ -102,7 +103,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     label: "Refuse and ban",
     icon: ShieldBanIcon,
     variant: "destructive",
-    available: holdable,
+    available: holdable("banned"),
     prompt: {
       title: (m) => `Ban ${m.person.name || "this account"}?`,
       description: "The photo stays refused and the account is closed: its email, phone and sign-ins can't come back.",
@@ -110,7 +111,7 @@ const actions: ReviewAction<ProfilePhoto>[] = [
     },
     statement: {},
     done: "Photo refused, account banned.",
-    decide: (m, { reason, category, details }) => ({ intent: "photo", media: m.id, reason, hold: "banned", category, details }),
+    decide: (m, answer) => ({ intent: "photo", media: m.id, reason: answer.reason, hold: "banned", ...toldIn(answer) }),
   },
 ];
 

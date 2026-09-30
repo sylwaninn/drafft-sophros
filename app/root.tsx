@@ -13,7 +13,7 @@ import { staffContext } from "~/lib/context";
 import { AuthError, identify } from "~/lib/.server/auth";
 import { getConfig } from "~/lib/.server/config";
 import { rpc } from "~/lib/.server/db";
-import type { ReasonCategory } from "~/lib/reasons";
+import { reasonCategories } from "~/lib/reasons";
 import { rootRevalidation } from "~/lib/revalidate";
 import { letterShortcutsCookie, letterShortcutsOn } from "~/lib/preferences";
 import { ShieldIcon } from "lucide-react";
@@ -49,11 +49,11 @@ function cookie(request: Request, name: string) {
 export async function loader({ request, context }: Route.LoaderArgs): Promise<RootData> {
   const staff = context.get(staffContext);
   const config = getConfig();
-  const [overview, reasonCategories] = await Promise.all([
+  const [overview, categories] = await Promise.all([
     rpc<Pick<RootData, "queues" | "holds">>(staff, "admin_overview"),
     // The categories a decision is told with. Without them the decision forms say so and wait, rather
     // than the whole dashboard failing.
-    rpc<ReasonCategory[] | null>(staff, "admin_reason_categories").catch((error: unknown) => {
+    rpc<unknown>(staff, "admin_reason_categories").catch((error: unknown) => {
       console.error("admin_reason_categories", error);
       return null;
     }),
@@ -69,7 +69,7 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Ro
     holds: overview.holds,
     queues: overview.queues,
     countedAt: new Date().toISOString(),
-    reasonCategories: reasonCategories ?? [],
+    reasonCategories: reasonCategories(categories),
   };
 }
 
