@@ -9,9 +9,10 @@ import { staffContext } from "~/lib/context";
 import { DbError, rpc } from "~/lib/.server/db";
 import { refusalMessage, refusals, type RefusalCode } from "~/lib/refusals";
 import { deleteMessage } from "~/lib/.server/stream";
+import { deletedMessage, deletionReference } from "~/lib/deletion";
 import { DETAILS_MAX, isOverrideBasis, reasonCategories, RESOLUTION_MAX, type Told } from "~/lib/reasons";
 import type { Staff } from "~/lib/roles";
-import { isHold, type Hold } from "~/lib/types";
+import { isHold, type DeleteAccountResult, type Hold } from "~/lib/types";
 import type { Route } from "./+types/act";
 
 export type ActResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -145,6 +146,19 @@ export async function action({ request, context }: Route.ActionArgs) {
           ok: true,
           message: count ? `${count} event${count === 1 ? "" : "s"} discarded.` : "Nothing to discard: already handled.",
         });
+      }
+      case "delete-account": {
+        // At the member's request, admins only (the database checks). The backend deletes it a moment later,
+        // exactly as the app's own deletion would, and emails the confirmation (or tells the team when there's
+        // no address to write to).
+        const reference = deletionReference(text("reference"));
+        if (!reference) return result({ ok: false, error: refusals.invalid_reference }, 400);
+        const queued = await rpc<DeleteAccountResult>(staff, "admin_delete_account", {
+          p_user: text("user"),
+          p_reason: text("reason"),
+          p_reference: reference,
+        });
+        return result({ ok: true, message: deletedMessage(queued) });
       }
       case "data-request":
         await rpc(staff, "admin_fulfil_data_request", { p_id: Number(text("id")) });

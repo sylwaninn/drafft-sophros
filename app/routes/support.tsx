@@ -1,6 +1,17 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Form, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
-import { ArrowRightIcon, CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
+import { Form, Link, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  DownloadIcon,
+  LifeBuoyIcon,
+  MailCheckIcon,
+  MailIcon,
+  RotateCcwIcon,
+  SearchIcon,
+  SendIcon,
+  UserXIcon,
+} from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -18,10 +29,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { ActButton, useAct } from "~/components/app/act";
+import { useRoot } from "~/components/app/root-data";
 import { Facts, Id, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
+import { deletionLink } from "~/lib/deletion";
 import { query } from "~/lib/.server/db";
-import type { DataRequest, SupportRequest } from "~/lib/types";
+import { delivery, fromMember, listBadge, replySending, sender } from "~/lib/support";
+import type { DataRequest, SupportMessage, SupportRequest, TeamReply } from "~/lib/types";
 import type { Route } from "./+types/support";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -74,7 +88,7 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
     <Page>
       <PageHeader
         title="Support"
-        description="Messages from the app's help forms, and data exports to send. Open a request to reply: the email leaves from here, in their language."
+        description="Messages from the app's help forms and the support address, and data exports to send. Open a request to reply: the email leaves from here, in their language."
         actions={
           <ToggleGroup
             type="single"
@@ -143,11 +157,7 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
                         {s.person ? <PersonLink person={s.person} /> : <span className="text-muted-foreground">{s.email}</span>}
                       </TableCell>
                       <TableCell className="max-w-80 truncate text-muted-foreground">
-                        {s.replies.length > 0 && (
-                          <Badge variant="outline" className="mr-2">
-                            {s.replies.length} repl{s.replies.length === 1 ? "y" : "ies"}
-                          </Badge>
-                        )}
+                        <ListBadgeFor request={s} />
                         {s.message}
                       </TableCell>
                       <TableCell>
@@ -220,8 +230,74 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
   );
 }
 
-/** A request, the team's replies under it, and the reply box: sent by email from the backend. */
+/** Before a request's message in the list: the member wrote back by email, else the team's replies. */
+function ListBadgeFor({ request }: { request: SupportRequest }) {
+  const badge = listBadge(request);
+  if (!badge) return null;
+  if (badge.kind === "wrote-back")
+    return (
+      <Badge className="mr-2">
+        <MailIcon data-icon="inline-start" />
+        Member wrote back
+      </Badge>
+    );
+  return (
+    <Badge variant="outline" className="mr-2">
+      {badge.count} repl{badge.count === 1 ? "y" : "ies"}
+    </Badge>
+  );
+}
+
+/** Where a reply of the team stands: sending, sent, or retried by the backend after a failure. */
+function DeliveryBadge({ reply }: { reply: TeamReply }) {
+  switch (delivery(reply)) {
+    case "failed":
+      return <Badge variant="destructive">Not sent, retrying</Badge>;
+    case "sent":
+      return (
+        <Badge variant="secondary">
+          <MailCheckIcon data-icon="inline-start" />
+          Sent
+        </Badge>
+      );
+    case "sending":
+      return (
+        <Badge variant="outline">
+          <Spinner data-icon="inline-start" />
+          Sending
+        </Badge>
+      );
+  }
+}
+
+/** A message under the request: the member's email, or the team's reply, indented, with where it stands. */
+function ThreadMessage({ request, message: m }: { request: SupportRequest; message: SupportMessage }) {
+  const member = fromMember(m);
+  return (
+    <Item variant={member ? "muted" : "outline"} className={member ? "items-start" : "ml-8 items-start"}>
+      <ItemContent>
+        <ItemDescription className="flex flex-wrap items-center gap-1.5">
+          {sender(request, m)}, <TimeAgo value={m.createdAt} />
+          {member ? (
+            <Badge variant="secondary">
+              <MailIcon data-icon="inline-start" />
+              By email
+            </Badge>
+          ) : (
+            <DeliveryBadge reply={m} />
+          )}
+        </ItemDescription>
+        <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
+      </ItemContent>
+    </Item>
+  );
+}
+
+/** A request, its thread (the team's replies, the member's answers by email) and the reply box: sent by email from
+ * the backend. */
 function Thread({ request: r }: { request: SupportRequest }) {
+  const { staff } = useRoot();
+  const deleteLink = deletionLink(staff, r);
   const form = useRef<HTMLFormElement>(null);
   const formId = useId();
   const [close, setClose] = useState(true);
@@ -241,7 +317,7 @@ function Thread({ request: r }: { request: SupportRequest }) {
   });
   // A reply is emailed by the backend a moment later: check back until it's sent.
   const revalidator = useRevalidator();
-  const sending = r.replies.some((m) => !m.sentAt && !m.error);
+  const sending = replySending(r);
   useEffect(() => {
     if (!sending) return;
     const t = setInterval(() => revalidator.state === "idle" && revalidator.revalidate(), 3000);
@@ -265,6 +341,16 @@ function Thread({ request: r }: { request: SupportRequest }) {
               ["Status", r.handled_at ? `Handled by ${r.handled_by}` : "Open"],
             ]}
           />
+          {/* A member asking to delete their account: an admin checks it's them, then deletes it from the account's
+              page with this request as its reference. */}
+          {deleteLink && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={deleteLink} viewTransition>
+                <UserXIcon data-icon="inline-start" />
+                Delete this account at their request
+              </Link>
+            </Button>
+          )}
           <ItemGroup className="gap-3">
             <Item variant="muted" className="items-start">
               <ItemContent>
@@ -275,27 +361,7 @@ function Thread({ request: r }: { request: SupportRequest }) {
               </ItemContent>
             </Item>
             {r.replies.map((m) => (
-              <Item key={m.id} variant="outline" className="ml-8 items-start">
-                <ItemContent>
-                  <ItemDescription className="flex flex-wrap items-center gap-1.5">
-                    {m.author}, <TimeAgo value={m.createdAt} />
-                    {m.error ? (
-                      <Badge variant="destructive">Not sent, retrying</Badge>
-                    ) : m.sentAt ? (
-                      <Badge variant="secondary">
-                        <MailCheckIcon data-icon="inline-start" />
-                        Sent
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline">
-                        <Spinner data-icon="inline-start" />
-                        Sending
-                      </Badge>
-                    )}
-                  </ItemDescription>
-                  <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
-                </ItemContent>
-              </Item>
+              <ThreadMessage key={m.id} request={r} message={m} />
             ))}
           </ItemGroup>
         </div>
@@ -328,7 +394,8 @@ function Thread({ request: r }: { request: SupportRequest }) {
               }}
             />
             <FieldDescription>
-              Emailed to {r.email} with the reference, framed in their language. Their answer reaches the support inbox.
+              Emailed to {r.email} with the reference, framed in their language. If they answer this email from the same address, it comes
+              back to this thread.
             </FieldDescription>
           </Field>
         </fetcher.Form>

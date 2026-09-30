@@ -31,8 +31,20 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
   | ----------- | -------------------------------------------------------------------------------------------------------------------------- |
   | `support`   | accounts, support requests, reports (read), photo queue (read), notes, mark support handled and exports sent               |
   | `moderator` | holds (review, selfie, ban), photos, flagged media, reports, conversations, selfies, sign-out everywhere, message deletion |
-  | `admin`     | lifting a ban, staff, the whole audit log                                                                                  |
+  | `admin`     | lifting a ban, staff, the whole audit log, deleting an account at the member's request                                     |
 
+- **Deleting an account at the member's request** (admins only; the website tells members to write to support
+  from the account's email address, or from another address giving its phone number, and the team asks them to
+  confirm it's them): the account's ⋯ menu, or "Delete this account at their request" on a support request (its
+  reference prefilled; not shown for an account deleted already). The dialog says first whether the account will
+  be erased or kept for members' safety (banned, held or under an open report) and where the confirmation goes
+  (the account's email, and the request's address when it differs); it needs a reason and the request's
+  reference (`DR-XXXXXX`, or `email` for a message outside the support requests, never prefilled from the menu).
+  When the account is deleted already, a deletion is on its way, or the preview fails, the menu item is disabled
+  with the reason. The backend deletes it exactly as the app's own deletion would, within minutes (the website
+  promises 30 days at most), deciding again at that moment, writes `account.delete` to the audit log and emails
+  the confirmation, or tells the team when there's no address (drafft-backend #54,
+  `admin_account_deletion_preview` and `admin_delete_account`: deploy the backend first).
 - **Sensitive reads are logged too:** opening an account (`user.view`), a selfie (`selfie.view`), a
   conversation (`conversation.view`, on both accounts, with where it was opened from). Selfies and
   conversations open only for a reason the person types (see below). Each account page shows its staff
@@ -101,7 +113,7 @@ missing.
 | Account          | profile and photos, email and phone, sign-in methods, sessions (IP, client), devices (model, iOS, app version, locale, time zone, IP, country, opens, last opened), IPs, approximate location, usage, holds and their history, reports, blocks, flagged media, related accounts (same install, IP or marked identity), matches, wallet and purchases, support, notes, staff trail; hold, sign out everywhere, approve or refuse photos |
 | Verifications    | selfie (opened for a typed reason) next to the profile photos (lift, ask again, ban), accounts in review, selfies owed                                                                                                                                                                                                                                                                                                                 |
 | Reports          | open reports with both people, the count of reporters, their conversation; close with a resolution and an optional hold                                                                                                                                                                                                                                                                                                                |
-| Support          | help-form messages with their thread; replies are written here and emailed by the backend in the person's language; data exports to send                                                                                                                                                                                                                                                                                               |
+| Support          | messages from the help forms and the support address, with their thread; replies are written here and emailed by the backend in the person's language; the member's answers by email come back into the thread (marked By email) and reopen the request, listed as Member wrote back after a reply of the team; data exports to send                                                                                                   |
 | Profile photos   | one by one: pending photos (approve, refuse) and ones refused automatically (keep, approve anyway); refuse and hold or ban                                                                                                                                                                                                                                                                                                             |
 | Shared media     | one by one: chat photos the silent check flagged, already delivered; act on the sender (fine, hold, selfie, ban); history and most flagged                                                                                                                                                                                                                                                                                             |
 | Conversations    | every match, filtered by person, name or email, status, a report between them, flagged chat photos, sessions; a conversation opens with its basis and a typed reason; delete a message                                                                                                                                                                                                                                                 |

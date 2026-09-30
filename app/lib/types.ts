@@ -116,8 +116,28 @@ export interface SupportRequest {
   handled_at: string | null;
   handled_by: string | null;
   person: Person | null;
-  replies: { id: number; author: string; body: string; createdAt: string; sentAt: string | null; error: string | null }[];
+  /** The thread under the first message, oldest first: the team's replies and the member's emails. */
+  replies: SupportMessage[];
 }
+
+/** A message of a support thread (admin_support): the team's reply or the member's email. */
+export type SupportMessage = TeamReply | MemberEmail;
+
+interface ThreadMessage {
+  id: number;
+  body: string;
+  createdAt: string;
+}
+
+/** Written in sophros by a staff member (`author`) and emailed by the backend: sending until `sentAt` or `error` is
+ * set, never both. */
+export type TeamReply = ThreadMessage & { direction: "out"; author: string } & (
+    { sentAt: null; error: null } | { sentAt: string; error: null } | { sentAt: null; error: string }
+  );
+
+/** Written by the member and received by email (drafft-backend, "Support by email"): `author` is the sender's
+ * address, `sentAt` when it arrived; nothing to send, so never an error. */
+export type MemberEmail = ThreadMessage & { direction: "in"; author: string; sentAt: string; error: null };
 
 export interface DataRequest {
   id: number;
@@ -175,6 +195,33 @@ export interface Device {
   first_seen_at: string;
   last_seen_at: string;
 }
+
+/** Why a deleted account is kept for members' safety: banned, held, or under an open report. */
+export type RetentionBasis = "ban" | "hold" | "report";
+
+/** What deleting an account does: erased, or kept for members' safety (a soft delete). */
+export type DeletionOutcome = "erased" | "kept";
+
+/** Where the member's confirmation goes. `emailed` false: no address at all, the team is told instead. */
+export interface DeletionConfirmation {
+  emails: string[];
+  emailed: boolean;
+}
+
+/** Before deleting an account at the member's request, ready to confirm: the outcome expected now. */
+export type ReadyDeletion = DeletionConfirmation &
+  ({ status: "ready"; outcome: "erased" } | { status: "ready"; outcome: "kept"; basis: RetentionBasis });
+
+/** Before deleting an account at the member's request (admin_account_deletion_preview). */
+export type DeletionPreview = { status: "deleted" } | { status: "pending" } | ReadyDeletion;
+
+/** A deletion queued at the member's request (admin_delete_account): decided again when it runs. */
+export interface DeleteAccountResult extends DeletionConfirmation {
+  expected: DeletionOutcome;
+}
+
+/** The deletion preview as the account page gets it: null for staff below admin. */
+export type DeletionCheck = { ok: true; preview: DeletionPreview } | { ok: false; error: string } | null;
 
 /** Why an account deleted by its owner was kept (admin_account_deletion). */
 export interface AccountDeletion {
