@@ -106,18 +106,24 @@ export interface SupportRequest {
   replies: SupportMessage[];
 }
 
-export interface SupportMessage {
+/** A message of a support thread (admin_support): the team's reply or the member's email. */
+export type SupportMessage = TeamReply | MemberEmail;
+
+interface ThreadMessage {
   id: number;
-  /** The staff member, or the member's address for a message received by email. */
-  author: string;
   body: string;
   createdAt: string;
-  /** Sent by email (a reply), or received (the member's email). */
-  sentAt: string | null;
-  error: string | null;
-  /** "out": the team's reply; "in": the member's email. Missing on a backend that doesn't file emails yet. */
-  direction?: "in" | "out";
 }
+
+/** Written in sophros by a staff member (`author`) and emailed by the backend: sending until `sentAt` or `error` is
+ * set, never both. */
+export type TeamReply = ThreadMessage & { direction: "out"; author: string } & (
+    { sentAt: null; error: null } | { sentAt: string; error: null } | { sentAt: null; error: string }
+  );
+
+/** Written by the member and received by email (drafft-backend, "Support by email"): `author` is the sender's
+ * address, `sentAt` when it arrived; nothing to send, so never an error. */
+export type MemberEmail = ThreadMessage & { direction: "in"; author: string; sentAt: string; error: null };
 
 export interface DataRequest {
   id: number;

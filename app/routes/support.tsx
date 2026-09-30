@@ -31,8 +31,8 @@ import { ActButton, useAct } from "~/components/app/act";
 import { Facts, Id, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
-import { fromMember, memberWroteLast, replySending, teamReplies } from "~/lib/support";
-import type { DataRequest, SupportRequest } from "~/lib/types";
+import { delivery, fromMember, listBadge, replySending, sender } from "~/lib/support";
+import type { DataRequest, SupportRequest, TeamReply } from "~/lib/types";
 import type { Route } from "./+types/support";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -154,18 +154,7 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
                         {s.person ? <PersonLink person={s.person} /> : <span className="text-muted-foreground">{s.email}</span>}
                       </TableCell>
                       <TableCell className="max-w-80 truncate text-muted-foreground">
-                        {memberWroteLast(s) ? (
-                          <Badge className="mr-2">
-                            <MailIcon data-icon="inline-start" />
-                            Answered by email
-                          </Badge>
-                        ) : (
-                          teamReplies(s).length > 0 && (
-                            <Badge variant="outline" className="mr-2">
-                              {teamReplies(s).length} repl{teamReplies(s).length === 1 ? "y" : "ies"}
-                            </Badge>
-                          )
-                        )}
+                        <ListBadgeFor request={s} />
                         {s.message}
                       </TableCell>
                       <TableCell>
@@ -238,6 +227,46 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
   );
 }
 
+/** Before a request's message in the list: the member wrote back by email, else the team's replies. */
+function ListBadgeFor({ request }: { request: SupportRequest }) {
+  const badge = listBadge(request);
+  if (!badge) return null;
+  if (badge.kind === "wrote-back")
+    return (
+      <Badge className="mr-2">
+        <MailIcon data-icon="inline-start" />
+        Member wrote back
+      </Badge>
+    );
+  return (
+    <Badge variant="outline" className="mr-2">
+      {badge.count} repl{badge.count === 1 ? "y" : "ies"}
+    </Badge>
+  );
+}
+
+/** Where a reply of the team stands: sending, sent, or retried by the backend after a failure. */
+function DeliveryBadge({ reply }: { reply: TeamReply }) {
+  switch (delivery(reply)) {
+    case "failed":
+      return <Badge variant="destructive">Not sent, retrying</Badge>;
+    case "sent":
+      return (
+        <Badge variant="secondary">
+          <MailCheckIcon data-icon="inline-start" />
+          Sent
+        </Badge>
+      );
+    case "sending":
+      return (
+        <Badge variant="outline">
+          <Spinner data-icon="inline-start" />
+          Sending
+        </Badge>
+      );
+  }
+}
+
 /** A request, its thread (the team's replies, the member's answers by email) and the reply box: sent by email from
  * the backend. */
 function Thread({ request: r }: { request: SupportRequest }) {
@@ -298,7 +327,7 @@ function Thread({ request: r }: { request: SupportRequest }) {
                 <Item key={m.id} variant="muted" className="items-start">
                   <ItemContent>
                     <ItemDescription className="flex flex-wrap items-center gap-1.5">
-                      {r.person?.name || m.author}, <TimeAgo value={m.createdAt} />
+                      {sender(r, m)}, <TimeAgo value={m.createdAt} />
                       <Badge variant="secondary">
                         <MailIcon data-icon="inline-start" />
                         By email
@@ -311,20 +340,8 @@ function Thread({ request: r }: { request: SupportRequest }) {
                 <Item key={m.id} variant="outline" className="ml-8 items-start">
                   <ItemContent>
                     <ItemDescription className="flex flex-wrap items-center gap-1.5">
-                      {m.author}, <TimeAgo value={m.createdAt} />
-                      {m.error ? (
-                        <Badge variant="destructive">Not sent, retrying</Badge>
-                      ) : m.sentAt ? (
-                        <Badge variant="secondary">
-                          <MailCheckIcon data-icon="inline-start" />
-                          Sent
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">
-                          <Spinner data-icon="inline-start" />
-                          Sending
-                        </Badge>
-                      )}
+                      {sender(r, m)}, <TimeAgo value={m.createdAt} />
+                      <DeliveryBadge reply={m} />
                     </ItemDescription>
                     <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
                   </ItemContent>
