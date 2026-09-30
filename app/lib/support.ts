@@ -8,9 +8,10 @@ export function fromMember(m: SupportMessage): m is MemberEmail {
   return m.direction === "in";
 }
 
-/** The team's replies only. */
+/** The team's replies only (everything not received from the member: a row from before the backend said who wrote
+ * it was the team's). */
 export function teamReplies(r: SupportRequest): TeamReply[] {
-  return r.replies.filter((m): m is TeamReply => m.direction === "out");
+  return r.replies.filter((m): m is TeamReply => !fromMember(m));
 }
 
 /** Where a reply of the team stands: the backend emails it a moment later, and retries it when that fails. */
