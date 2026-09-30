@@ -1,6 +1,16 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Form, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
-import { ArrowRightIcon, CheckIcon, DownloadIcon, LifeBuoyIcon, MailCheckIcon, RotateCcwIcon, SearchIcon, SendIcon } from "lucide-react";
+import { Form, Link, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  DownloadIcon,
+  LifeBuoyIcon,
+  MailCheckIcon,
+  RotateCcwIcon,
+  SearchIcon,
+  SendIcon,
+  UserXIcon,
+} from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -18,6 +28,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { ActButton, useAct } from "~/components/app/act";
+import { useRoot } from "~/components/app/root-data";
+import { can } from "~/lib/roles";
 import { Facts, Id, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
@@ -222,6 +234,7 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
 
 /** A request, the team's replies under it, and the reply box: sent by email from the backend. */
 function Thread({ request: r }: { request: SupportRequest }) {
+  const { staff } = useRoot();
   const form = useRef<HTMLFormElement>(null);
   const formId = useId();
   const [close, setClose] = useState(true);
@@ -265,6 +278,16 @@ function Thread({ request: r }: { request: SupportRequest }) {
               ["Status", r.handled_at ? `Handled by ${r.handled_by}` : "Open"],
             ]}
           />
+          {/* A member asking to delete their account (the website sends them here): an admin checks it's them,
+              then deletes it from the account's page, this request as its reference. */}
+          {can(staff, "admin") && r.person && !r.person.deleted && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/accounts/${r.person.id}?${new URLSearchParams({ delete: r.reference })}`} viewTransition>
+                <UserXIcon data-icon="inline-start" />
+                Delete this account at their request
+              </Link>
+            </Button>
+          )}
           <ItemGroup className="gap-3">
             <Item variant="muted" className="items-start">
               <ItemContent>

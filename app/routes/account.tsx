@@ -10,6 +10,7 @@ import {
   MessagesSquareIcon,
   NotebookPenIcon,
   SmartphoneIcon,
+  UserXIcon,
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +24,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Field, FieldLabel } from "~/components/ui/field";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { Field, FieldDescription, FieldLabel } from "~/components/ui/field";
+import { Input } from "~/components/ui/input";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "~/components/ui/item";
 import { Separator } from "~/components/ui/separator";
 import { Spinner } from "~/components/ui/spinner";
@@ -53,19 +56,25 @@ import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
 import { revalidateOnNewRead } from "~/lib/audited-reads";
-import type { AccountDeletion, AuditEntry, UserDetail } from "~/lib/types";
+import { confirmationTo, deletionOutcome } from "~/lib/deletion";
+import type { AccountDeletion, AuditEntry, DeletionPreview, UserDetail } from "~/lib/types";
 import { reasons } from "./reports";
 import type { Route } from "./+types/account";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const staff = context.get(staffContext);
-  const [user, audit, deletion] = await Promise.all([
+  const [user, audit, deletion, deletionPreview] = await Promise.all([
     query<UserDetail>(staff, "admin_user", { p_user: params.id }),
     can(staff, "moderator") ? query<AuditEntry[]>(staff, "admin_audit", { p_user: params.id, p_limit: 50 }) : Promise.resolve(null),
     // Null unless the owner deleted the account and it was kept (reported, held or banned).
     query<AccountDeletion | null>(staff, "admin_account_deletion", { p_user: params.id }),
+    // Admins only: what deleting it at the member's request would do. Null when the backend can't say (an
+    // older backend, an account gone).
+    can(staff, "admin")
+      ? query<DeletionPreview>(staff, "admin_account_deletion_preview", { p_user: params.id }).catch(() => null)
+      : Promise.resolve(null),
   ]);
-  return { user, audit, deletion };
+  return { user, audit, deletion, deletionPreview };
 }
 
 // Another tab shows the same account: it isn't read (nor logged as opened) again.
@@ -131,7 +140,7 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   );
 }
 
-export default function Account({ loaderData: { user: u, audit, deletion } }: Route.ComponentProps) {
+export default function Account({ loaderData: { user: u, audit, deletion, deletionPreview } }: Route.ComponentProps) {
   const { staff } = useRoot();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -175,7 +184,7 @@ export default function Account({ loaderData: { user: u, audit, deletion } }: Ro
             </Button>
           )}
           <HoldControls user={p.id} name={p.name} current={p.moderation} />
-          <MoreMenu u={u} moderator={moderator} />
+          <MoreMenu u={u} moderator={moderator} preview={deletionPreview} />
         </div>
       </div>
 
@@ -282,8 +291,12 @@ export default function Account({ loaderData: { user: u, audit, deletion } }: Ro
   );
 }
 
-function MoreMenu({ u, moderator }: { u: UserDetail; moderator: boolean }) {
+function MoreMenu({ u, moderator, preview }: { u: UserDetail; moderator: boolean; preview: DeletionPreview | null }) {
   const [revoking, setRevoking] = useState(false);
+  // Opened from a support request (its "Delete this account"): the dialog opens with that request's reference.
+  const [params] = useSearchParams();
+  const [deleting, setDeleting] = useState(() => params.has("delete"));
+  const canDelete = !!preview && !preview.deleted;
   return (
     <>
       <DropdownMenu>
@@ -317,6 +330,15 @@ function MoreMenu({ u, moderator }: { u: UserDetail; moderator: boolean }) {
               </DropdownMenuItem>
             </>
           )}
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
+                <UserXIcon />
+                Delete account at the member's request
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       {moderator && (
@@ -329,6 +351,41 @@ function MoreMenu({ u, moderator }: { u: UserDetail; moderator: boolean }) {
           open={revoking}
           onOpenChange={setRevoking}
         />
+      )}
+      {canDelete && (
+        <ReasonDialog
+          intent="delete-account"
+          fields={{ user: u.profile.id }}
+          title="Delete account at the member's request"
+          description="Only when the member asked: from the account's email address, or with its phone number, confirmed."
+          placeholder="How they asked and how you checked it was them"
+          submit={preview.outcome === "erase" ? "Delete and erase" : "Delete and keep for safety"}
+          destructive
+          open={deleting}
+          onOpenChange={setDeleting}
+        >
+          <Alert variant={preview.outcome === "erase" ? "destructive" : "default"}>
+            <UserXIcon />
+            <AlertTitle>{preview.outcome === "erase" ? "It will be erased" : "It will be kept for safety"}</AlertTitle>
+            <AlertDescription>
+              <p>{deletionOutcome(preview)}</p>
+              <p>Confirmation to {confirmationTo(preview)}.</p>
+              {preview.pending && <p>A deletion is already on its way.</p>}
+            </AlertDescription>
+          </Alert>
+          <Field>
+            <FieldLabel htmlFor="delete-account-reference">Request</FieldLabel>
+            <Input
+              id="delete-account-reference"
+              name="reference"
+              required
+              maxLength={20}
+              defaultValue={params.get("delete") || "email"}
+              placeholder="DR-XXXXXX, or email"
+            />
+            <FieldDescription>The support reference, or email for a message outside the support requests.</FieldDescription>
+          </Field>
+        </ReasonDialog>
       )}
     </>
   );
