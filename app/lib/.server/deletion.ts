@@ -1,5 +1,5 @@
 // What deleting an account at the member's request would do, for the account page (admins only).
-import { deletionReference } from "~/lib/deletion";
+import { supportReference } from "~/lib/deletion";
 import { can, type Staff } from "~/lib/roles";
 import type { DeletionCheck, DeletionPreview } from "~/lib/types";
 import { DbError, rpc } from "./db";
@@ -12,11 +12,11 @@ import { DbError, rpc } from "./db";
 export async function deletionCheck(staff: Staff, user: string, requested: string | null): Promise<DeletionCheck> {
   if (!can(staff, "admin")) return null;
   // An "email" reference adds no address; a malformed one is refused when the admin confirms.
-  const reference = deletionReference(requested);
+  const reference = supportReference(requested);
   try {
     const preview = await rpc<DeletionPreview>(staff, "admin_account_deletion_preview", {
       p_user: user,
-      p_reference: reference?.startsWith("DR-") ? reference : null,
+      p_reference: reference,
     });
     return { ok: true, preview };
   } catch (error) {

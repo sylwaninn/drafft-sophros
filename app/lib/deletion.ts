@@ -14,6 +14,12 @@ export function deletionReference(value: string | null | undefined): DeletionRef
   return /^DR-[A-Z0-9]{6}$/i.test(v) ? (v.toUpperCase() as DeletionReference) : null;
 }
 
+/** The support reference only, normalised: null for "email" as for anything else. */
+export function supportReference(value: string | null | undefined): Exclude<DeletionReference, "email"> | null {
+  const reference = deletionReference(value);
+  return reference === "email" ? null : reference;
+}
+
 /** From a support request, the account page with its deletion dialog open on this request. Null below admin,
  * without an account, or for an account deleted already (erased, or kept for members' safety). */
 export function deletionLink(staff: Staff, r: Pick<SupportRequest, "reference" | "person">): string | null {

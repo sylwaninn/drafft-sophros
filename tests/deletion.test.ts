@@ -7,6 +7,7 @@ import {
   deletionOutcome,
   deletionPrefill,
   deletionReference,
+  supportReference,
 } from "~/lib/deletion";
 import type { Staff } from "~/lib/roles";
 import type { ReadyDeletion } from "~/lib/types";
@@ -32,6 +33,13 @@ describe("the request behind a deletion", () => {
   it("refuses nothing given", () => {
     expect(deletionReference(null)).toBeNull();
     expect(deletionReference(undefined)).toBeNull();
+  });
+
+  it("keeps only a support reference when one is wanted", () => {
+    expect(supportReference(" dr-abc234 ")).toBe("DR-ABC234");
+    expect(supportReference("email")).toBeNull();
+    expect(supportReference("DR-12")).toBeNull();
+    expect(supportReference(null)).toBeNull();
   });
 });
 

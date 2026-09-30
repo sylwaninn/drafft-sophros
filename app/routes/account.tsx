@@ -58,8 +58,8 @@ import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
 import { revalidateOnNewRead } from "~/lib/audited-reads";
 import { deletionCheck } from "~/lib/.server/deletion";
-import { confirmationTo, deletionAvailability, deletionOutcome, deletionPrefill, deletionReference } from "~/lib/deletion";
-import type { AccountDeletion, AuditEntry, DeletionCheck, UserDetail } from "~/lib/types";
+import { confirmationTo, deletionAvailability, deletionOutcome, deletionPrefill, supportReference } from "~/lib/deletion";
+import type { AccountDeletion, AuditEntry, DeletionCheck, ReadyDeletion, UserDetail } from "~/lib/types";
 import { reasons } from "./reports";
 import type { Route } from "./+types/account";
 
@@ -361,40 +361,66 @@ function MoreMenu({ u, moderator, check }: { u: UserDetail; moderator: boolean; 
         />
       )}
       {available.ok && (
-        <ReasonDialog
-          intent="delete-account"
-          fields={{ user: u.profile.id }}
-          title="Delete account at the member's request"
-          description="Only when the member asked: from the account's email address, or from another address giving its phone number, and then confirmed it was them."
-          placeholder="How they asked and how you checked it was them"
-          submit={available.preview.outcome === "erased" ? "Delete and erase" : "Delete and keep for safety"}
-          destructive
+        <DeleteAccountDialog
+          user={u.profile.id}
+          preview={available.preview}
+          reference={prefill.reference}
           open={deleting}
           onOpenChange={setDeleting}
-        >
-          <Alert variant={available.preview.outcome === "erased" ? "destructive" : "default"}>
-            <UserXIcon />
-            <AlertTitle>{available.preview.outcome === "erased" ? "It will be erased" : "It will be kept for safety"}</AlertTitle>
-            <AlertDescription>
-              <p>{deletionOutcome(available.preview)}</p>
-              <p>Confirmation to {confirmationTo(available.preview, !!deletionReference(prefill.reference)?.startsWith("DR-"))}.</p>
-            </AlertDescription>
-          </Alert>
-          <Field>
-            <FieldLabel htmlFor="delete-account-reference">Request</FieldLabel>
-            <Input
-              id="delete-account-reference"
-              name="reference"
-              required
-              maxLength={20}
-              defaultValue={prefill.reference}
-              placeholder="DR-XXXXXX, or email"
-            />
-            <FieldDescription>The support reference, or email for a message outside the support requests.</FieldDescription>
-          </Field>
-        </ReasonDialog>
+        />
       )}
     </>
+  );
+}
+
+/** Deleting the account at the member's request: what will happen, where the confirmation goes, and the request. */
+function DeleteAccountDialog({
+  user,
+  preview,
+  reference,
+  open,
+  onOpenChange,
+}: {
+  user: string;
+  preview: ReadyDeletion;
+  reference: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const erased = preview.outcome === "erased";
+  return (
+    <ReasonDialog
+      intent="delete-account"
+      fields={{ user }}
+      title="Delete account at the member's request"
+      description="Only when the member asked: from the account's email address, or from another address giving its phone number, and then confirmed it was them."
+      placeholder="How they asked and how you checked it was them"
+      submit={erased ? "Delete and erase" : "Delete and keep for safety"}
+      destructive
+      open={open}
+      onOpenChange={onOpenChange}
+    >
+      <Alert variant={erased ? "destructive" : "default"}>
+        <UserXIcon />
+        <AlertTitle>{erased ? "It will be erased" : "It will be kept for safety"}</AlertTitle>
+        <AlertDescription>
+          <p>{deletionOutcome(preview)}</p>
+          <p>Confirmation to {confirmationTo(preview, supportReference(reference) !== null)}.</p>
+        </AlertDescription>
+      </Alert>
+      <Field>
+        <FieldLabel htmlFor="delete-account-reference">Request</FieldLabel>
+        <Input
+          id="delete-account-reference"
+          name="reference"
+          required
+          maxLength={20}
+          defaultValue={reference}
+          placeholder="DR-XXXXXX, or email"
+        />
+        <FieldDescription>The support reference, or email for a message outside the support requests.</FieldDescription>
+      </Field>
+    </ReasonDialog>
   );
 }
 
