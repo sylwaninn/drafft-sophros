@@ -53,6 +53,8 @@ import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
 import { revalidateOnNewRead } from "~/lib/audited-reads";
+import { deletionIdentityRows } from "~/lib/deletion-identities";
+import { suggestedCategory } from "~/lib/reasons";
 import type { AccountDeletion, AuditEntry, UserDetail } from "~/lib/types";
 import { reasons } from "./reports";
 import type { Route } from "./+types/account";
@@ -115,11 +117,23 @@ function DeletionPanel({ deletion: d }: { deletion: AccountDeletion }) {
           ],
           ["Past holds", d.holds.length > 0 ? d.holds.map((h) => holdLabel(h.state)).join(", ") : null],
           ["Legal basis", "Members' safety"],
-          ["Email then", d.identities.email ?? null],
-          ["Phone then", d.identities.phone ? `+${d.identities.phone}` : null],
+          ...deletionIdentityRows(d).map(([label, value]): [string, React.ReactNode] => [
+            label,
+            Array.isArray(value) ? <Lines lines={value} /> : value,
+          ]),
         ]}
       />
     </Panel>
+  );
+}
+
+function Lines({ lines }: { lines: string[] }) {
+  return (
+    <ul className="space-y-0.5">
+      {lines.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+    </ul>
   );
 }
 
@@ -378,10 +392,21 @@ function ProfileTab({ u, moderator }: { u: UserDetail; moderator: boolean }) {
                       </ActButton>
                     )}
                     {m.status !== "rejected" && (
-                      <ActButton intent="media" fields={{ media: m.id, approved: "false" }} size="xs" variant="outline" className="flex-1">
-                        <XIcon data-icon="inline-start" />
-                        Refuse
-                      </ActButton>
+                      <ReasonDialog
+                        intent="media"
+                        fields={{ media: m.id, approved: "false" }}
+                        statement={{ category: suggestedCategory("photo") }}
+                        title={`Refuse photo ${u.media.indexOf(m) + 1}?`}
+                        description="It's hidden from everyone. They're told why, and can ask for a second look."
+                        placeholder="What's wrong with it, for the audit log"
+                        submit="Refuse"
+                        trigger={
+                          <Button size="xs" variant="outline" className="flex-1">
+                            <XIcon data-icon="inline-start" />
+                            Refuse
+                          </Button>
+                        }
+                      />
                     )}
                   </div>
                 )}
