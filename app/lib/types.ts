@@ -184,7 +184,23 @@ export interface AccountDeletion {
   moderation: Hold | null;
   reports: { id: string; reason: string; createdAt: string; handledAt: string | null; resolution: string | null }[];
   holds: { state: Hold; note: string | null; createdAt: string }[];
-  identities: { email?: string | null; phone?: string | null; oauth?: { provider: string; email: string | null }[] };
+  /** Which sign-in identities existed, never their values; `{}` once the retention purge cleared them. */
+  identities: DeletionIdentities | Record<string, never>;
+  /** When the retention purge cleared `identities`; absent while admin_account_deletion doesn't return it. */
+  identitiesPurgedAt?: string | null;
+}
+
+/** An Apple or Google sign-in of a deleted account: the provider and its dates, no provider id or email. */
+export interface DeletionOAuthSignIn {
+  provider: string;
+  createdAt: string | null;
+  lastSignInAt: string | null;
+}
+
+export interface DeletionIdentities {
+  email: boolean;
+  phone: boolean;
+  oauth: DeletionOAuthSignIn[];
 }
 
 export interface UserDetail {
