@@ -172,3 +172,75 @@ describe("failed events", () => {
     expect(answer.data).toEqual({ ok: false, error: "Your role doesn't allow this." });
   });
 });
+
+describe("deleting an account at the member's request", () => {
+  const ask = (changes: Record<string, string> = {}) =>
+    post({ intent: "delete-account", user: "u1", reason: "asked by email", reference: "DR-ABC234", ...changes });
+
+  it.each(["DR-12", "", "phone"])("refuses the reference %j without calling the database", async (reference) => {
+    const answer = await ask({ reference });
+    expect(answer.init?.status).toBe(400);
+    expect(answer.data).toEqual({ ok: false, error: "Give the support reference (DR-XXXXXX), or email." });
+    expect(mockedRpc).not.toHaveBeenCalled();
+  });
+
+  it("sends the normalised reference in one call", async () => {
+    mockedRpc.mockResolvedValue({ expected: "erased", emails: ["lea@drafft.test"], emailed: true });
+    await ask({ reference: " dr-abc234 " });
+    await ask({ reference: "EMAIL" });
+    expect(mockedRpc).toHaveBeenCalledTimes(2);
+    expect(mockedRpc.mock.calls[0].slice(1)).toEqual([
+      "admin_delete_account",
+      { p_user: "u1", p_reason: "asked by email", p_reference: "DR-ABC234" },
+    ]);
+    expect(mockedRpc.mock.calls[1][2]).toMatchObject({ p_reference: "email" });
+  });
+
+  it("says the outcome the backend expects and where the confirmation goes", async () => {
+    mockedRpc.mockResolvedValueOnce({ expected: "erased", emails: ["lea@drafft.test"], emailed: true });
+    expect((await ask()).data).toEqual({
+      ok: true,
+      message: "Deletion on its way: the account will be erased, unless a report or hold arrives first. Confirmation to lea@drafft.test.",
+    });
+    mockedRpc.mockResolvedValueOnce({ expected: "kept", emails: [], emailed: false });
+    expect((await ask()).data).toEqual({
+      ok: true,
+      message:
+        "Deletion on its way: the account will be kept for members' safety. No address to confirm to: the team gets an email to confirm another way.",
+    });
+  });
+
+  it("leaves the role to the database", async () => {
+    mockedRpc.mockRejectedValueOnce(new DbError("not allowed", "forbidden", 403));
+    const answer = await ask();
+    expect(answer.init?.status).toBe(403);
+    expect(answer.data).toEqual({ ok: false, error: "Your role doesn't allow this." });
+    expect(mockedRpc).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["already_deleted", "This account is deleted already."],
+    ["already_requested", "A deletion of this account is already on its way."],
+    ["invalid_reference", "Give the support reference (DR-XXXXXX), or email."],
+    ["unknown_reference", "No support request has this reference."],
+    ["reason_required", "Say why: the reason goes to the audit log."],
+    ["not_found", "It's gone, or already handled."],
+  ])("explains %s", async (code, error) => {
+    mockedRpc.mockRejectedValueOnce(new DbError("refused", code, 400));
+    const answer = await ask();
+    expect(answer.init?.status).toBe(400);
+    expect(answer.data).toEqual({ ok: false, error });
+  });
+
+  it("lets the database refuse an empty reason", async () => {
+    mockedRpc.mockRejectedValueOnce(new DbError("say why", "reason_required", 400));
+    const answer = await ask({ reason: "  " });
+    expect(mockedRpc.mock.calls[0][2]).toMatchObject({ p_reason: "" });
+    expect(answer.data).toEqual({ ok: false, error: "Say why: the reason goes to the audit log." });
+  });
+
+  it("keeps the database's own message for a code it doesn't know", async () => {
+    mockedRpc.mockRejectedValueOnce(new DbError("something new", "constructor", 400));
+    expect((await ask()).data).toEqual({ ok: false, error: "something new" });
+  });
+});
