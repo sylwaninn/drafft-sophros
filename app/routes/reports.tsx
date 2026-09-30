@@ -16,7 +16,8 @@ import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
 import { query } from "~/lib/.server/db";
-import type { Report } from "~/lib/types";
+import { RESOLUTION_MAX, suggestedCategory } from "~/lib/reasons";
+import { holdChanges, isHold, type Hold, type Report } from "~/lib/types";
 import type { Route } from "./+types/reports";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -120,9 +121,27 @@ export default function Reports({ loaderData: { reports } }: Route.ComponentProp
   );
 }
 
+const reportHolds: { state: Hold; label: string }[] = [
+  { state: "review", label: "Hold for review" },
+  { state: "selfie", label: "Ask for a selfie" },
+  { state: "banned", label: "Ban" },
+];
+
+/** What closing the report does, with the hold chosen. */
+function closingDescription(hold: Hold | "none"): string {
+  switch (hold) {
+    case "none":
+      return "The resolution goes to the audit log. Nobody is told.";
+    case "banned":
+      return "The ban applies at once: the account closes for good, and its email, phone and sign-ins can't come back. They're told why.";
+    default:
+      return "The hold applies at once, and they're told why. The resolution goes to the audit log.";
+  }
+}
+
 function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: () => void }) {
   const { staff } = useRoot();
-  const [hold, setHold] = useState("none");
+  const [hold, setHold] = useState<Hold | "none">("none");
   const [reading, setReading] = useState<string | null>(null);
   const moderator = can(staff, "moderator");
   const ban = hold === "banned";
@@ -171,32 +190,37 @@ function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: (
                 <SheetFooter className="gap-3">
                   <Field>
                     <FieldLabel htmlFor="report-hold">Hold on {r.reported.name ?? "the account"}</FieldLabel>
-                    <Select value={hold} onValueChange={setHold}>
+                    <Select value={hold} onValueChange={(value) => setHold(isHold(value) ? value : "none")}>
                       <SelectTrigger id="report-hold" className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">No hold</SelectItem>
-                        <SelectItem value="review">Hold for review</SelectItem>
-                        <SelectItem value="selfie">Ask for a selfie</SelectItem>
-                        <SelectItem value="banned">Ban</SelectItem>
+                        {/* Only a hold that changes the account: the one it has would tell them nothing. */}
+                        {reportHolds
+                          .filter((h) => holdChanges(r.reported?.moderation, h.state))
+                          .map((h) => (
+                            <SelectItem key={h.state} value={h.state}>
+                              {h.label}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </Field>
                   <ReasonDialog
-                    key={ban ? "ban" : "close"}
+                    key={hold}
                     intent="report"
                     fields={{ report: r.id, user: r.reported.id, hold: hold === "none" ? "" : hold }}
+                    // A hold is told to them with its reason; closing alone tells nobody.
+                    statement={hold === "none" ? undefined : { category: suggestedCategory(hold) }}
                     reasonName="resolution"
+                    // With a hold, the hold's reason repeats the resolution after "report: ".
+                    maxLength={hold === "none" ? undefined : RESOLUTION_MAX}
                     label="Resolution"
                     placeholder="What you found and did"
                     destructive={ban}
                     title={ban ? `Ban ${r.reported.name ?? "this account"} and close the report` : "Close the report"}
-                    description={
-                      ban
-                        ? "The ban applies at once: the account closes for good, and its email, phone and sign-ins can't come back. The resolution goes to the audit log."
-                        : "The resolution goes to the audit log; the hold, if any, applies at once."
-                    }
+                    description={closingDescription(hold)}
                     submit={ban ? "Ban and close" : "Close the report"}
                     trigger={
                       <Button className="w-full" variant={ban ? "destructive" : "default"}>

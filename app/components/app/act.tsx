@@ -34,14 +34,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "~/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "~/components/ui/field";
 import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
 import { can } from "~/lib/roles";
+import { REASON_MAX, suggestedCategory, type Statement } from "~/lib/reasons";
 import type { Hold } from "~/lib/types";
 import type { ActResult } from "~/routes/act";
 import { useRoot } from "./root-data";
+import { StatementFields, useStatementReady } from "./statement-fields";
 
 type Fields = Record<string, string | number | null | undefined | (string | number)[]>;
 
@@ -60,6 +62,16 @@ export function useAct({ onDone }: { onDone?: () => void } = {}) {
     }
   }, [fetcher.state, fetcher.data, onDone]);
   return { fetcher, pending: fetcher.state !== "idle" };
+}
+
+/**
+ * The refusal of the last try made since the calling form mounted, until the next try: shown in the form,
+ * which stays open. An answer from before it opened doesn't count.
+ */
+export function useRefusal(fetcher: ReturnType<typeof useAct>["fetcher"]): string | null {
+  const [before] = useState(fetcher.data);
+  const answer = fetcher.state === "idle" && fetcher.data !== before ? fetcher.data : undefined;
+  return answer && !answer.ok ? answer.error : null;
 }
 
 function Hidden({ intent, fields }: { intent: string; fields: Fields }) {
@@ -94,22 +106,28 @@ export function ActButton({
 
 /**
  * A change that needs a reason for the audit log, asked in a dialog. `destructive` asks in an alert
- * dialog instead (bans, deletions). Extra inputs go in `children`.
+ * dialog instead (bans, deletions). `statement`: the member is told this decision and why, so the
+ * dialog also asks for the reason category they're told (preselected when `statement.category` is
+ * given) and a note for them; the reason typed here then stays internal. Extra inputs go in `children`.
+ * A refusal keeps the dialog open with what was typed, and says why in it.
  */
 export function ReasonDialog({
   intent,
   fields = {},
   title,
   description,
-  label = "Reason",
+  label,
   placeholder = "What you saw, for the audit log",
   submit,
   destructive = false,
   defaultReason = "",
   required = true,
   reasonName = "reason",
+  maxLength = REASON_MAX,
+  statement,
   open,
   onOpenChange,
+  onDone,
   trigger,
   children,
 }: {
@@ -124,57 +142,44 @@ export function ReasonDialog({
   defaultReason?: string;
   required?: boolean;
   reasonName?: string;
+  /** The reason's length limit, when the database adds to it. */
+  maxLength?: number;
+  statement?: { category?: string };
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Once the change is applied (the dialog then closes). */
+  onDone?: () => void;
   trigger?: ReactNode;
   children?: ReactNode;
 }) {
   const [innerOpen, setInnerOpen] = useState(false);
   const isOpen = open ?? innerOpen;
   const setOpen = onOpenChange ?? setInnerOpen;
-  const { fetcher, pending } = useAct({ onDone: () => setOpen(false) });
+  const act = useAct({
+    onDone: () => {
+      setOpen(false);
+      onDone?.();
+    },
+  });
 
+  // Mounted with the dialog's content: every opening starts from a blank form.
   const form = (
-    <fetcher.Form method="post" action="/act" defaultShouldRevalidate className="grid gap-6">
-      <Hidden intent={intent} fields={fields} />
-      <FieldGroup>
-        {children}
-        <Field>
-          <FieldLabel htmlFor={`${intent}-${reasonName}`}>{label}</FieldLabel>
-          <Textarea
-            id={`${intent}-${reasonName}`}
-            name={reasonName}
-            required={required}
-            maxLength={1000}
-            rows={3}
-            defaultValue={defaultReason}
-            placeholder={placeholder}
-          />
-          {required && <FieldDescription>Saved with your email in the audit log.</FieldDescription>}
-        </Field>
-      </FieldGroup>
-      {destructive ? (
-        <AlertDialogFooter>
-          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-          <Button type="submit" variant="destructive" disabled={pending}>
-            {pending && <Spinner data-icon="inline-start" />}
-            {submit}
-          </Button>
-        </AlertDialogFooter>
-      ) : (
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Cancel
-            </Button>
-          </DialogClose>
-          <Button type="submit" disabled={pending}>
-            {pending && <Spinner data-icon="inline-start" />}
-            {submit}
-          </Button>
-        </DialogFooter>
-      )}
-    </fetcher.Form>
+    <ReasonForm
+      act={act}
+      intent={intent}
+      fields={fields}
+      label={label ?? (statement ? "Internal reason" : "Reason")}
+      placeholder={placeholder}
+      submit={submit}
+      destructive={destructive}
+      defaultReason={defaultReason}
+      required={required}
+      reasonName={reasonName}
+      maxLength={maxLength}
+      statement={statement}
+    >
+      {children}
+    </ReasonForm>
   );
 
   if (destructive) {
@@ -206,6 +211,89 @@ export function ReasonDialog({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function ReasonForm({
+  act: { fetcher, pending },
+  intent,
+  fields,
+  label,
+  placeholder,
+  submit,
+  destructive,
+  defaultReason,
+  required,
+  reasonName,
+  maxLength,
+  statement,
+  children,
+}: {
+  act: ReturnType<typeof useAct>;
+  intent: string;
+  fields: Fields;
+  label: string;
+  placeholder: string;
+  submit: string;
+  destructive: boolean;
+  defaultReason: string;
+  required: boolean;
+  reasonName: string;
+  maxLength: number;
+  statement?: { category?: string };
+  children?: ReactNode;
+}) {
+  const [told, setTold] = useState<Statement>({ category: statement?.category });
+  const toldReady = useStatementReady(told);
+  const ready = !statement || toldReady;
+  const refused = useRefusal(fetcher);
+  return (
+    <fetcher.Form method="post" action="/act" defaultShouldRevalidate className="grid gap-6">
+      <Hidden intent={intent} fields={fields} />
+      <FieldGroup>
+        {children}
+        {statement && <StatementFields id={intent} value={told} onChange={setTold} />}
+        <Field>
+          <FieldLabel htmlFor={`${intent}-${reasonName}`}>{label}</FieldLabel>
+          <Textarea
+            id={`${intent}-${reasonName}`}
+            name={reasonName}
+            required={required}
+            maxLength={maxLength}
+            rows={3}
+            defaultValue={defaultReason}
+            placeholder={placeholder}
+          />
+          {required && (
+            <FieldDescription>
+              {statement ? "Not sent to them: saved with your email in the audit log." : "Saved with your email in the audit log."}
+            </FieldDescription>
+          )}
+        </Field>
+        {refused && <FieldError>{refused}</FieldError>}
+      </FieldGroup>
+      {destructive ? (
+        <AlertDialogFooter>
+          <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+          <Button type="submit" variant="destructive" disabled={pending || !ready}>
+            {pending && <Spinner data-icon="inline-start" />}
+            {submit}
+          </Button>
+        </AlertDialogFooter>
+      ) : (
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" disabled={pending || !ready}>
+            {pending && <Spinner data-icon="inline-start" />}
+            {submit}
+          </Button>
+        </DialogFooter>
+      )}
+    </fetcher.Form>
   );
 }
 
@@ -273,6 +361,7 @@ export function RestrictMenu({
           open={chosen !== null}
           onOpenChange={(open) => !open && setChosen(null)}
           destructive={choice.state === "banned"}
+          statement={{ category: suggestedCategory(choice.state) }}
           title={`${choice.label}: ${name || "this account"}`}
           description={choice.description}
           submit={choice.label}
