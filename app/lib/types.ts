@@ -116,8 +116,28 @@ export interface SupportRequest {
   handled_at: string | null;
   handled_by: string | null;
   person: Person | null;
-  replies: { id: number; author: string; body: string; createdAt: string; sentAt: string | null; error: string | null }[];
+  /** The thread under the first message, oldest first: the team's replies and the member's emails. */
+  replies: SupportMessage[];
 }
+
+/** A message of a support thread (admin_support): the team's reply or the member's email. */
+export type SupportMessage = TeamReply | MemberEmail;
+
+interface ThreadMessage {
+  id: number;
+  body: string;
+  createdAt: string;
+}
+
+/** Written in sophros by a staff member (`author`) and emailed by the backend: sending until `sentAt` or `error` is
+ * set, never both. */
+export type TeamReply = ThreadMessage & { direction: "out"; author: string } & (
+    { sentAt: null; error: null } | { sentAt: string; error: null } | { sentAt: null; error: string }
+  );
+
+/** Written by the member and received by email (drafft-backend, "Support by email"): `author` is the sender's
+ * address, `sentAt` when it arrived; nothing to send, so never an error. */
+export type MemberEmail = ThreadMessage & { direction: "in"; author: string; sentAt: string; error: null };
 
 export interface DataRequest {
   id: number;
