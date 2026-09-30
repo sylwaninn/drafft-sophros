@@ -163,6 +163,16 @@ export interface Device {
 }
 
 /** Why an account deleted by its owner was kept (admin_account_deletion). */
+/** Before deleting an account at the member's request (admin_account_deletion_preview). */
+export interface DeletionPreview {
+  outcome: "erase" | "keep";
+  basis: "ban" | "hold" | "report" | null;
+  deleted: boolean;
+  /** A deletion is already on its way. */
+  pending: boolean;
+  email: string | null;
+}
+
 export interface AccountDeletion {
   deletedAt: string;
   basis: "ban" | "hold" | "report";

@@ -5,6 +5,7 @@ import { data } from "react-router";
 import { staffContext } from "~/lib/context";
 import { DbError, rpc } from "~/lib/.server/db";
 import { deleteMessage } from "~/lib/.server/stream";
+import { deletionReference } from "~/lib/deletion";
 import type { Hold } from "~/lib/types";
 import type { Route } from "./+types/act";
 
@@ -19,6 +20,9 @@ const errors: Record<string, string> = {
   empty_reply: "Write the reply first.",
   one_account: "These flags belong to more than one account.",
   invalid_ids: "Choose between 1 and 200 events.",
+  invalid_reference: "Give the support reference (DR-XXXXXX), or email.",
+  already_deleted: "This account is deleted already.",
+  already_requested: "A deletion of this account is already on its way.",
 };
 
 const holds = new Set<unknown>(["review", "selfie", "banned"]);
@@ -106,6 +110,24 @@ export async function action({ request, context }: Route.ActionArgs) {
         return result({
           ok: true,
           message: count ? `${count} event${count === 1 ? "" : "s"} discarded.` : "Nothing to discard: already handled.",
+        });
+      }
+      case "delete-account": {
+        // At the member's request, admins only (the database checks). The backend deletes it a moment later,
+        // exactly as the app's own deletion would, and emails the member a confirmation.
+        const reference = deletionReference(text("reference"));
+        if (!reference) return result({ ok: false, error: errors.invalid_reference }, 400);
+        const queued = await rpc<{ expected: "erase" | "keep" }>(staff, "admin_delete_account", {
+          p_user: text("user"),
+          p_reason: text("reason"),
+          p_reference: reference,
+        });
+        return result({
+          ok: true,
+          message:
+            queued.expected === "erase"
+              ? "Deletion on its way: the account will be erased, and the member told by email."
+              : "Deletion on its way: the account will be kept for members' safety, and the member told by email.",
         });
       }
       case "data-request":
