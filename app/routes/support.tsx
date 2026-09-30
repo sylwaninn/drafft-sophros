@@ -32,7 +32,7 @@ import { Facts, Id, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/com
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
 import { delivery, fromMember, listBadge, replySending, sender } from "~/lib/support";
-import type { DataRequest, SupportRequest, TeamReply } from "~/lib/types";
+import type { DataRequest, SupportMessage, SupportRequest, TeamReply } from "~/lib/types";
 import type { Route } from "./+types/support";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -267,6 +267,29 @@ function DeliveryBadge({ reply }: { reply: TeamReply }) {
   }
 }
 
+/** A message under the request: the member's email, or the team's reply, indented, with where it stands. */
+function ThreadMessage({ request, message: m }: { request: SupportRequest; message: SupportMessage }) {
+  const member = fromMember(m);
+  return (
+    <Item variant={member ? "muted" : "outline"} className={member ? "items-start" : "ml-8 items-start"}>
+      <ItemContent>
+        <ItemDescription className="flex flex-wrap items-center gap-1.5">
+          {sender(request, m)}, <TimeAgo value={m.createdAt} />
+          {member ? (
+            <Badge variant="secondary">
+              <MailIcon data-icon="inline-start" />
+              By email
+            </Badge>
+          ) : (
+            <DeliveryBadge reply={m} />
+          )}
+        </ItemDescription>
+        <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
+      </ItemContent>
+    </Item>
+  );
+}
+
 /** A request, its thread (the team's replies, the member's answers by email) and the reply box: sent by email from
  * the backend. */
 function Thread({ request: r }: { request: SupportRequest }) {
@@ -322,32 +345,9 @@ function Thread({ request: r }: { request: SupportRequest }) {
                 <ItemTitle className="font-normal whitespace-pre-wrap">{r.message}</ItemTitle>
               </ItemContent>
             </Item>
-            {r.replies.map((m) =>
-              fromMember(m) ? (
-                <Item key={m.id} variant="muted" className="items-start">
-                  <ItemContent>
-                    <ItemDescription className="flex flex-wrap items-center gap-1.5">
-                      {sender(r, m)}, <TimeAgo value={m.createdAt} />
-                      <Badge variant="secondary">
-                        <MailIcon data-icon="inline-start" />
-                        By email
-                      </Badge>
-                    </ItemDescription>
-                    <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
-                  </ItemContent>
-                </Item>
-              ) : (
-                <Item key={m.id} variant="outline" className="ml-8 items-start">
-                  <ItemContent>
-                    <ItemDescription className="flex flex-wrap items-center gap-1.5">
-                      {sender(r, m)}, <TimeAgo value={m.createdAt} />
-                      <DeliveryBadge reply={m} />
-                    </ItemDescription>
-                    <ItemTitle className="font-normal whitespace-pre-wrap">{m.body}</ItemTitle>
-                  </ItemContent>
-                </Item>
-              ),
-            )}
+            {r.replies.map((m) => (
+              <ThreadMessage key={m.id} request={r} message={m} />
+            ))}
           </ItemGroup>
         </div>
       </ScrollArea>
