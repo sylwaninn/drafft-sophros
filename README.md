@@ -31,8 +31,20 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
   | ----------- | -------------------------------------------------------------------------------------------------------------------------- |
   | `support`   | accounts, support requests, reports (read), photo queue (read), notes, mark support handled and exports sent               |
   | `moderator` | holds (review, selfie, ban), photos, flagged media, reports, conversations, selfies, sign-out everywhere, message deletion |
-  | `admin`     | lifting a ban, staff, the whole audit log                                                                                  |
+  | `admin`     | lifting a ban, staff, the whole audit log, deleting an account at the member's request                                     |
 
+- **Deleting an account at the member's request** (admins only; the website tells members to write to support
+  from the account's email address, or from another address giving its phone number, and the team asks them to
+  confirm it's them): the account's ⋯ menu, or "Delete this account at their request" on a support request (its
+  reference prefilled; not shown for an account deleted already). The dialog says first whether the account will
+  be erased or kept for members' safety (banned, held or under an open report) and where the confirmation goes
+  (the account's email, and the request's address when it differs); it needs a reason and the request's
+  reference (`DR-XXXXXX`, or `email` for a message outside the support requests, never prefilled from the menu).
+  When the account is deleted already, a deletion is on its way, or the preview fails, the menu item is disabled
+  with the reason. The backend deletes it exactly as the app's own deletion would, within minutes (the website
+  promises 30 days at most), deciding again at that moment, writes `account.delete` to the audit log and emails
+  the confirmation, or tells the team when there's no address (drafft-backend #54,
+  `admin_account_deletion_preview` and `admin_delete_account`: deploy the backend first).
 - **Sensitive reads are logged too:** opening an account (`user.view`), a selfie (`selfie.view`), a
   conversation (`conversation.view`, on both accounts, with where it was opened from). Selfies and
   conversations open only for a reason the person types (see below). Each account page shows its staff

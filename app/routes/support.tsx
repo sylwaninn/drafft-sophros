@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Form, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
+import { Form, Link, useFetcher, useNavigate, useRevalidator, useSearchParams } from "react-router";
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -10,6 +10,7 @@ import {
   RotateCcwIcon,
   SearchIcon,
   SendIcon,
+  UserXIcon,
 } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -28,8 +29,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { ActButton, useAct } from "~/components/app/act";
+import { useRoot } from "~/components/app/root-data";
 import { Facts, Id, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
+import { deletionLink } from "~/lib/deletion";
 import { query } from "~/lib/.server/db";
 import { delivery, fromMember, listBadge, replySending, sender } from "~/lib/support";
 import type { DataRequest, SupportMessage, SupportRequest, TeamReply } from "~/lib/types";
@@ -293,6 +296,8 @@ function ThreadMessage({ request, message: m }: { request: SupportRequest; messa
 /** A request, its thread (the team's replies, the member's answers by email) and the reply box: sent by email from
  * the backend. */
 function Thread({ request: r }: { request: SupportRequest }) {
+  const { staff } = useRoot();
+  const deleteLink = deletionLink(staff, r);
   const form = useRef<HTMLFormElement>(null);
   const formId = useId();
   const [close, setClose] = useState(true);
@@ -336,6 +341,16 @@ function Thread({ request: r }: { request: SupportRequest }) {
               ["Status", r.handled_at ? `Handled by ${r.handled_by}` : "Open"],
             ]}
           />
+          {/* A member asking to delete their account: an admin checks it's them, then deletes it from the account's
+              page with this request as its reference. */}
+          {deleteLink && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={deleteLink} viewTransition>
+                <UserXIcon data-icon="inline-start" />
+                Delete this account at their request
+              </Link>
+            </Button>
+          )}
           <ItemGroup className="gap-3">
             <Item variant="muted" className="items-start">
               <ItemContent>

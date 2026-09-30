@@ -15,6 +15,10 @@ export const refusals = {
   invalid_target: "That message isn't one of theirs in this conversation: nothing was applied.",
   no_basis: "No report, help request or hold concerns these two: only an admin can read it, as an override.",
   override_basis_required: "Say why you read it without a basis: a legal request or members' safety.",
+  invalid_reference: "Give the support reference (DR-XXXXXX), or email.",
+  unknown_reference: "No support request has this reference.",
+  already_deleted: "This account is deleted already.",
+  already_requested: "A deletion of this account is already on its way.",
   // Postgres' check_violation: a text longer than the database keeps.
   "23514": "Too long for the audit log: shorten the reason and try again.",
 } as const satisfies Record<string, string>;
