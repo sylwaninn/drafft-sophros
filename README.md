@@ -31,8 +31,15 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
   | ----------- | -------------------------------------------------------------------------------------------------------------------------- |
   | `support`   | accounts, support requests, reports (read), photo queue (read), notes, mark support handled and exports sent               |
   | `moderator` | holds (review, selfie, ban), photos, flagged media, reports, conversations, selfies, sign-out everywhere, message deletion |
-  | `admin`     | lifting a ban, staff, the whole audit log                                                                                  |
+  | `admin`     | lifting a ban, staff, the whole audit log, deleting an account at the member's request                                     |
 
+- **Deleting an account at the member's request** (admins only; the website tells members to write to support
+  from the account's email, or with its phone number, confirmed): the account's ⋯ menu, or "Delete this account at
+  their request" on a support request (its reference prefilled). The dialog says first whether the account will be
+  erased or kept for members' safety (banned, held or under an open report) and where the confirmation email
+  goes; it needs a reason and the request's reference. The backend deletes it exactly as the app's own deletion
+  would, within minutes (the website promises 30 days at most), writes `account.delete` to the audit log and
+  emails the member (drafft-backend `admin_delete_account`: deploy the backend first).
 - **Sensitive reads are logged too:** opening an account (`user.view`), a selfie (`selfie.view`), a
   conversation (`conversation.view`, on both accounts, with where it was opened from). Each account page
   shows its staff trail.
