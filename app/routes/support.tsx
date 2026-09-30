@@ -29,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { ActButton, useAct } from "~/components/app/act";
 import { useRoot } from "~/components/app/root-data";
-import { can } from "~/lib/roles";
+import { deletionLink } from "~/lib/deletion";
 import { Facts, Id, Nothing, Page, PageHeader, PersonLink, TimeAgo } from "~/components/app/bits";
 import { staffContext } from "~/lib/context";
 import { query } from "~/lib/.server/db";
@@ -235,6 +235,7 @@ export default function Support({ loaderData: { requests, exports } }: Route.Com
 /** A request, the team's replies under it, and the reply box: sent by email from the backend. */
 function Thread({ request: r }: { request: SupportRequest }) {
   const { staff } = useRoot();
+  const deleteLink = deletionLink(staff, r);
   const form = useRef<HTMLFormElement>(null);
   const formId = useId();
   const [close, setClose] = useState(true);
@@ -278,11 +279,11 @@ function Thread({ request: r }: { request: SupportRequest }) {
               ["Status", r.handled_at ? `Handled by ${r.handled_by}` : "Open"],
             ]}
           />
-          {/* A member asking to delete their account (the website sends them here): an admin checks it's them,
-              then deletes it from the account's page, this request as its reference. */}
-          {can(staff, "admin") && r.person && !r.person.deleted && (
+          {/* A member asking to delete their account: an admin checks it's them, then deletes it from the account's
+              page with this request as its reference. */}
+          {deleteLink && (
             <Button variant="outline" size="sm" asChild>
-              <Link to={`/accounts/${r.person.id}?${new URLSearchParams({ delete: r.reference })}`} viewTransition>
+              <Link to={deleteLink} viewTransition>
                 <UserXIcon data-icon="inline-start" />
                 Delete this account at their request
               </Link>
