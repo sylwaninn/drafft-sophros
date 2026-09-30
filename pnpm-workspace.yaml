@@ -5,3 +5,8 @@
 allowBuilds:
   esbuild: true
   workerd: true
+# undici below 7.29.1 (through shadcn and wrangler) has two high advisories: GHSA-rfgv-xxqx-mfg5
+# (WebSocket subprotocol denial of service) and GHSA-w293-vg96-wgc3 (TLS validation bypass in
+# BalancedPool). Drop this once shadcn and wrangler require a fixed undici themselves.
+overrides:
+  undici@>=7.0.0 <7.29.1: ^7.29.1
