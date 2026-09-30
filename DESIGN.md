@@ -33,7 +33,8 @@ sophros is a standard shadcn/ui admin, deliberately separate from the drafft app
   button) and apply at once; ← → move.
 - Conversations open in a drawer on their basis (badges: report, help request, hold) and a field to say
   why; the messages load once it's filled. No basis: a destructive alert, and for admins only a "Read
-  without a basis" button confirmed in an AlertDialog. Each reading is logged with the reason and where it
+  without a basis" button confirmed in an AlertDialog, with a RadioGroup for why (a legal request or
+  members' safety). Each reading is logged with the reason and where it
   was opened from.
 - A selfie opens the same way: its slot holds the field to say why until it's shown.
 - Media never bleed to a card's edge: photo tiles stand on their own (ring, rounded-xl) with the caption

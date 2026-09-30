@@ -54,11 +54,15 @@ for three things:
 | Note for them   | `details`  | the member, sent as written (not translated), 1,000 characters at most; optional                                                                                 |
 | Internal reason | `reason`   | the audit and moderation logs only                                                                                                                               |
 
-`/act` refuses such a decision without a category before calling the database (without one the database
-would tell the member `other`); the database refuses an unknown one (`invalid_category`, nothing applied).
+`/act` refuses such a decision without a category, with one `admin_reason_categories` doesn't list, or with a
+note over 1,000 characters, before calling the database; the database checks all three again
+(`category_required`, `invalid_category`, `details_too_long`: nothing applied). The forms don't confirm until
+the category is one the database listed, so a preselected one can't slip through when the list couldn't be
+read. A refusal keeps the dialog open with what was typed. A hold the account already has isn't offered
+(nothing would be recorded, nor told).
 Where the decision itself says why, the category is preselected and can be changed: a selfie request
 (`identity_check`), a refused photo (`photo_guidelines`); never for a ban. Staff labels and the links to
-getdrafft.com/terms are in `app/lib/reasons.ts`. Decisions that tell the member nothing ask only for the
+getdrafft.com/terms (from each category's `termsAnchor`) are in `app/lib/reasons.ts`. Decisions that tell the member nothing ask only for the
 internal reason: lifting a hold (they're emailed that they're back), approving a photo, keeping an
 automatic refusal (they were told then), marking a flagged chat photo as fine, closing a report without a
 hold.
@@ -76,14 +80,17 @@ hold.
 logged) and shows the basis the database finds: a report between the two, a help request from either
 (open or from the last 90 days), either account on hold or banned. The messages load only once the person
 types why (`conversation-data` action, posted so the reason stays out of URLs); the reading is logged on
-both accounts with that reason and where it was opened from. Without a basis, a moderator can't read it
-(`no_basis`); an admin can, as an override confirmed in a second dialog and logged as one. Deleting a
-message needs the same basis or override, checked again by the database. There is no default reason any
-more: "opened in sophros" is refused (`reason_required`).
+both accounts with that reason and where it was opened from (the reason is cut so the whole fits the audit
+log's 1,000 characters; the drawer takes 785). Without a basis, a moderator can't read it (`no_basis`); an
+admin can, as an override confirmed in a second dialog that asks why (`p_override_basis`: a legal request or
+members' safety, else `override_basis_required`) and logged as one. A refused reading keeps the reason typed,
+and `no_basis` reloads the basis shown. Deleting a message needs the same basis or override, checked again
+by the database. There is no default reason any more: "opened in sophros" is refused (`reason_required`).
 
 **Viewing a selfie.** Verifications no longer signs the selfie in its loader: each case shows a field to
 say why, and `selfie-data` logs the viewing (`admin_selfies`, reason required) and returns a 5-minute
-link.
+link. A Storage failure says so (and can be tried again); only a case without any file says the selfie is
+missing.
 
 ## Pages
 
@@ -131,12 +138,12 @@ Checks, as CI runs them: `pnpm verify` (types, lint, format, tests, build); `pnp
 two ship in order, per environment:
 
 1. drafft-backend [#52](https://github.com/sylwaninn/drafft-backend/pull/52) (reasons and conversation
-   access) first. From then on the sophros deployed before it can no longer open a conversation (it sends
-   the refused default "opened in sophros", and nothing for a match without a basis), and its decisions
-   reach members as `other`.
-2. This version of sophros right after: it sends `p_category`, `p_details` and `p_override`, and calls
-   `admin_reason_categories` and `admin_conversation_access`, which don't exist before #52 (its decisions
-   would fail).
+   access) first. From then on the sophros deployed before it still reads a conversation that has a basis
+   (with the page it was opened from as the reason), but can't open one without a basis, and its decisions
+   that tell the member (holds, bans, refused photos, deleted messages) are refused (`category_required`).
+2. This version of sophros right after: it sends `p_category`, `p_details`, `p_override` and
+   `p_override_basis`, and calls `admin_reason_categories` and `admin_conversation_access`, which don't
+   exist before #52 (its decisions would fail).
 
 Per environment (`staging` first, then `production`):
 
@@ -182,6 +189,7 @@ gets a 401, and a valid person who isn't in `private.staff` a 403.
 
 sophros stores nothing itself. Device reports (model, iOS, app version, locale, time zone, IP, country)
 come from the app's `report_app_open` and are pruned by the database (IPs after 180 days without use,
-devices after a year). The privacy policy must say so, and that staff may read conversations when a
-report, a help request or a hold calls for it (enforced by the database; an admin's override is logged as
-one).
+devices after a year). The privacy policy must say so, and that staff may read conversations for a report,
+a help request or a risk to members' safety, as it does (the database's rule: a report between the two, a
+help request from either, a hold on either; otherwise an admin's override for a legal request or members'
+safety, logged as one).
