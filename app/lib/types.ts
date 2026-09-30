@@ -1,6 +1,20 @@
 // Shapes returned by the admin_* functions (jsonb), as the dashboard reads them.
 
-export type Hold = "review" | "selfie" | "banned";
+/** The holds an account can be under, strictest last. */
+export const HOLDS = ["review", "selfie", "banned"] as const;
+export type Hold = (typeof HOLDS)[number];
+
+export function isHold(value: unknown): value is Hold {
+  return (HOLDS as readonly unknown[]).includes(value);
+}
+
+/**
+ * Whether putting `next` on an account changes its hold: not on a banned account (lifting a ban takes
+ * an admin, from its page), and not the hold it already has (nothing would be recorded, nor told).
+ */
+export function holdChanges(current: Hold | null | undefined, next: Hold): boolean {
+  return current !== "banned" && current !== next;
+}
 
 export interface Person {
   id: string;

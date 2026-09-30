@@ -6,7 +6,7 @@ sophros is a standard shadcn/ui admin, deliberately separate from the drafft app
 
 - **Components:** shadcn/ui only (`app/components/ui`, radix base, preset Nova), added with
   `pnpm dlx shadcn@latest add <name>`. App pieces in `app/components/app` are compositions of them
-  (`Panel` = Card, `Nothing` = Empty, `ReasonDialog` = Dialog or AlertDialog + Field + Textarea,
+  (`Panel` = Card, `Nothing` = Empty, `ReasonDialog` = Dialog or AlertDialog + Field + Textarea, plus Select when the member is told,
   `HoldMenu` = DropdownMenu, `PersonLink` = Avatar + HoverCard). No hand-made control.
 - **Layout:** Sidebar (inset, collapsible to icons, `⌘B`) with the queues and their counts, a sticky
   header with breadcrumb and `⌘K` search (Command), pages at `max-w-7xl`. Lists are Table inside Card;
@@ -31,7 +31,12 @@ sophros is a standard shadcn/ui admin, deliberately separate from the drafft app
   anyway), plus refuse-and-hold or refuse-and-ban. **Shared media**: chat photos already delivered, so
   only the sender's account is acted on (nothing wrong, hold, selfie, ban). Letters decide (shown on each
   button) and apply at once; ← → move.
-- Conversations open in a drawer, readable at once; each reading is logged with where it was opened from.
+- Conversations open in a drawer on their basis (badges: report, help request, hold) and a field to say
+  why; the messages load once it's filled. No basis: a destructive alert, and for admins only a "Read
+  without a basis" button confirmed in an AlertDialog, with a RadioGroup for why (a legal request or
+  members' safety). Each reading is logged with the reason and where it
+  was opened from.
+- A selfie opens the same way: its slot holds the field to say why until it's shown.
 - Media never bleed to a card's edge: photo tiles stand on their own (ring, rounded-xl) with the caption
   below, and a radius nested inside padding is the outer radius minus the padding.
 
@@ -46,3 +51,9 @@ sophros is a standard shadcn/ui admin, deliberately separate from the drafft app
 
 English, sentence case, verbs on buttons ("Close the report", "Same person: lift the hold"). Every
 action that changes an account asks why, and says the reason goes to the audit log.
+
+A decision the member is told about asks, above the internal reason, for the reason they're told (a
+Select of categories, staff labels, with the part of the terms linked) and a note for them (Textarea,
+counter to 1,000, "Sent to the member as written"). The internal reason is then labelled as such and says
+it isn't sent to them (`StatementFields`, `app/components/app/statement-fields.tsx`). In the review
+queues these decisions ask in a dialog before applying: the letter opens it.

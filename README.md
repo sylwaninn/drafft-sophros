@@ -34,9 +34,63 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
   | `admin`     | lifting a ban, staff, the whole audit log                                                                                  |
 
 - **Sensitive reads are logged too:** opening an account (`user.view`), a selfie (`selfie.view`), a
-  conversation (`conversation.view`, on both accounts, with where it was opened from). Each account page
-  shows its staff trail.
+  conversation (`conversation.view`, on both accounts, with where it was opened from). Selfies and
+  conversations open only for a reason the person types (see below). Each account page shows its staff
+  trail.
 - **Headers:** a nonce-based Content-Security-Policy, no framing, no referrer, `noindex`, `no-store`.
+
+## Reasons and access
+
+Since drafft-backend migration `20260930000401_moderation_reasons_and_chat_access` (backend pull request
+[#52](https://github.com/sylwaninn/drafft-backend/pull/52)).
+
+**Decisions the member is told about** (DSA art. 17 statement of reasons): putting or changing a hold
+(review, selfie, ban), refusing a profile photo, deleting a chat message. Every form that makes one asks
+for three things:
+
+| Field           | Posted as  | Goes to                                                                                                                                                          |
+| --------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reason told     | `category` | the member, by email and push in their language, with the part of the terms it falls under; required, from `admin_reason_categories` (loaded by the root loader) |
+| Note for them   | `details`  | the member, sent as written (not translated), 1,000 characters at most; optional                                                                                 |
+| Internal reason | `reason`   | the audit and moderation logs only                                                                                                                               |
+
+`/act` refuses such a decision without a category, with one `admin_reason_categories` doesn't list, or with a
+note over 1,000 characters, before calling the database; the database checks all three again
+(`category_required`, `invalid_category`, `details_too_long`: nothing applied). The forms don't confirm until
+the category is one the database listed, so a preselected one can't slip through when the list couldn't be
+read. A refusal keeps the dialog open with what was typed. A hold the account already has isn't offered
+(nothing would be recorded, nor told).
+Where the decision itself says why, the category is preselected and can be changed: a selfie request
+(`identity_check`), a refused photo (`photo_guidelines`); never for a ban. Staff labels and the links to
+getdrafft.com/terms (from each category's `termsAnchor`) are in `app/lib/reasons.ts`. Decisions that tell the member nothing ask only for the
+internal reason: lifting a hold (they're emailed that they're back), approving a photo, keeping an
+automatic refusal (they were told then), marking a flagged chat photo as fine, closing a report without a
+hold.
+
+| Decision                                      | Function                                                |
+| --------------------------------------------- | ------------------------------------------------------- |
+| Restrict, ask for a selfie again, ban         | `admin_set_hold`                                        |
+| Refuse a photo (account page, Profile photos) | `admin_review_media`                                    |
+| Refuse and hold or ban (Profile photos)       | `admin_decide_photo`                                    |
+| Hold, selfie or ban from a chat photo         | `admin_decide_flags`                                    |
+| Close a report with a hold                    | `admin_close_report`                                    |
+| Delete a message (conversation drawer)        | `admin_log('message.delete')`, author told once removed |
+
+**Reading a conversation.** The drawer first asks `admin_conversation_access` (nothing read, nothing
+logged) and shows the basis the database finds: a report between the two, a help request from either
+(open or from the last 90 days), either account on hold or banned. The messages load only once the person
+types why (`conversation-data` action, posted so the reason stays out of URLs); the reading is logged on
+both accounts with that reason and where it was opened from (the reason is cut so the whole fits the audit
+log's 1,000 characters; the drawer takes 785). Without a basis, a moderator can't read it (`no_basis`); an
+admin can, as an override confirmed in a second dialog that asks why (`p_override_basis`: a legal request or
+members' safety, else `override_basis_required`) and logged as one. A refused reading keeps the reason typed,
+and `no_basis` reloads the basis shown. Deleting a message needs the same basis or override, checked again
+by the database. There is no default reason any more: "opened in sophros" is refused (`reason_required`).
+
+**Viewing a selfie.** Verifications no longer signs the selfie in its loader: each case shows a field to
+say why, and `selfie-data` logs the viewing (`admin_selfies`, reason required) and returns a 5-minute
+link. A Storage failure says so (and can be tried again); only a case without any file says the selfie is
+missing.
 
 ## Pages
 
@@ -45,12 +99,12 @@ staff browser ── Cloudflare Access (SSO, MFA, team policy) ── Worker "so
 | Queues           | every queue with its size and oldest case, the longest waiting first; accounts on hold                                                                                                                                                                                                                                                                                                                                                 |
 | Accounts         | search by name, email, phone digits or id; filters (held, flagged, reported, tempo)                                                                                                                                                                                                                                                                                                                                                    |
 | Account          | profile and photos, email and phone, sign-in methods, sessions (IP, client), devices (model, iOS, app version, locale, time zone, IP, country, opens, last opened), IPs, approximate location, usage, holds and their history, reports, blocks, flagged media, related accounts (same install, IP or marked identity), matches, wallet and purchases, support, notes, staff trail; hold, sign out everywhere, approve or refuse photos |
-| Verifications    | selfie next to the profile photos (lift, ask again, ban), accounts in review with their cause, selfies still owed                                                                                                                                                                                                                                                                                                                      |
+| Verifications    | selfie (opened for a typed reason) next to the profile photos (lift, ask again, ban), accounts in review, selfies owed                                                                                                                                                                                                                                                                                                                 |
 | Reports          | open reports with both people, the count of reporters, their conversation; close with a resolution and an optional hold                                                                                                                                                                                                                                                                                                                |
 | Support          | help-form messages with their thread; replies are written here and emailed by the backend in the person's language; data exports to send                                                                                                                                                                                                                                                                                               |
 | Profile photos   | one by one: pending photos (approve, refuse) and ones refused automatically (keep, approve anyway); refuse and hold or ban                                                                                                                                                                                                                                                                                                             |
 | Shared media     | one by one: chat photos the silent check flagged, already delivered; act on the sender (fine, hold, selfie, ban); history and most flagged                                                                                                                                                                                                                                                                                             |
-| Conversations    | every match, filtered by person, name or email, status, a report between them, flagged chat photos, sessions; a conversation opens with a reason; delete a message                                                                                                                                                                                                                                                                     |
+| Conversations    | every match, filtered by person, name or email, status, a report between them, flagged chat photos, sessions; a conversation opens with its basis and a typed reason; delete a message                                                                                                                                                                                                                                                 |
 | Audit log, Staff | admins                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ## Local development
@@ -79,6 +133,17 @@ scenes) copied to the local Storage, and their conversations are canned (Stream 
 Checks, as CI runs them: `pnpm verify` (types, lint, format, tests, build); `pnpm format` fixes formatting.
 
 ## Deploying
+
+**With drafft-backend.** sophros calls the backend's `admin_*` functions by their named arguments, so the
+two ship in order, per environment:
+
+1. drafft-backend [#52](https://github.com/sylwaninn/drafft-backend/pull/52) (reasons and conversation
+   access) first. From then on the sophros deployed before it still reads a conversation that has a basis
+   (with the page it was opened from as the reason), but can't open one without a basis, and its decisions
+   that tell the member (holds, bans, refused photos, deleted messages) are refused (`category_required`).
+2. This version of sophros right after: it sends `p_category`, `p_details`, `p_override` and
+   `p_override_basis`, and calls `admin_reason_categories` and `admin_conversation_access`, which don't
+   exist before #52 (its decisions would fail).
 
 Per environment (`staging` first, then `production`):
 
@@ -124,5 +189,7 @@ gets a 401, and a valid person who isn't in `private.staff` a 403.
 
 sophros stores nothing itself. Device reports (model, iOS, app version, locale, time zone, IP, country)
 come from the app's `report_app_open` and are pruned by the database (IPs after 180 days without use,
-devices after a year). The privacy policy must say so, and that staff may read conversations when a
-report or an investigation calls for it.
+devices after a year). The privacy policy must say so, and that staff may read conversations for a report,
+a help request or a risk to members' safety, as it does (the database's rule: a report between the two, a
+help request from either, a hold on either; otherwise an admin's override for a legal request or members'
+safety, logged as one).

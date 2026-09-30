@@ -12,8 +12,8 @@ import { QueueItem, QueueMotion } from "~/components/app/motion";
 import { useRoot } from "~/components/app/root-data";
 import { staffContext } from "~/lib/context";
 import { can } from "~/lib/roles";
-import { query, signedUrl } from "~/lib/.server/db";
-import { frontIndex, revalidateOnNewRead, selfieCaseShown } from "~/lib/audited-reads";
+import { query } from "~/lib/.server/db";
+import { frontIndex } from "~/lib/audited-reads";
 import type { Person } from "~/lib/types";
 import type { Route } from "./+types/verifications";
 
@@ -29,34 +29,17 @@ interface Queue {
   waitingSelfie: { person: Person; cause: Cause | null; since: string }[];
 }
 
-export async function loader({ request, context }: Route.LoaderArgs) {
-  const staff = context.get(staffContext);
-  const queue = await query<Queue>(staff, "admin_verifications");
-  // A selfie is shown to moderators only, through a 5-minute link, and each showing is logged: only
-  // the case in front on the selfies tab is signed, not the ones waiting behind it.
-  const url = new URL(request.url);
-  const picked = selfieCaseShown(url);
-  const front = picked === null ? undefined : queue.selfies[frontIndex(queue.selfies, picked)];
-  let selfie: { user: string; url: string | null } | null = null;
-  if (front && can(staff, "moderator")) {
-    const paths = await query<{ path: string; createdAt: string }[]>(staff, "admin_selfies", {
-      p_user: front.person.id,
-      p_reason: "verification queue",
-    });
-    selfie = { user: front.person.id, url: paths[0] ? await signedUrl("verification-selfies", paths[0].path) : null };
-  }
-  return { queue, selfie };
+export async function loader({ context }: Route.LoaderArgs) {
+  // Selfies aren't read here: each one opens for a reason typed on the case (selfie-data), logged.
+  return { queue: await query<Queue>(context.get(staffContext), "admin_verifications") };
 }
-
-// Moving between tabs doesn't read the queue again, nor log a selfie nobody is shown.
-export const shouldRevalidate = revalidateOnNewRead(selfieCaseShown);
 
 function cause(c: Cause | null) {
   if (!c) return "No reason recorded";
   return `${c.note ?? "No reason recorded"}${c.actor ? `, by ${c.actor}` : ", automatic"}`;
 }
 
-export default function Verifications({ loaderData: { queue, selfie } }: Route.ComponentProps) {
+export default function Verifications({ loaderData: { queue } }: Route.ComponentProps) {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const tab = params.get("tab") ?? "selfies";
@@ -86,7 +69,7 @@ export default function Verifications({ loaderData: { queue, selfie } }: Route.C
           {queue.selfies.length === 0 ? (
             <Nothing title="No selfie to compare">When someone sends the selfie they owe, it lands here.</Nothing>
           ) : (
-            <SelfieQueue queue={queue} selfie={selfie} focus={params.get("case")} />
+            <SelfieQueue queue={queue} focus={params.get("case")} />
           )}
         </TabsContent>
 
@@ -154,15 +137,7 @@ export default function Verifications({ loaderData: { queue, selfie } }: Route.C
 }
 
 /** The case in front (the oldest, or the one picked), and the ones waiting after it. */
-function SelfieQueue({
-  queue,
-  selfie,
-  focus,
-}: {
-  queue: Queue;
-  selfie: { user: string; url: string | null } | null;
-  focus: string | null;
-}) {
+function SelfieQueue({ queue, focus }: { queue: Queue; focus: string | null }) {
   const { staff } = useRoot();
   const index = frontIndex(queue.selfies, focus);
   const current = queue.selfies[index];
@@ -173,7 +148,6 @@ function SelfieQueue({
         <QueueItem key={current.person.id} id={current.person.id}>
           <SelfieCompare
             item={{ ...current, cause: cause(current.cause) }}
-            selfie={selfie?.user === current.person.id ? selfie.url : null}
             position={index + 1}
             total={queue.selfies.length}
             canDecide={can(staff, "moderator")}
