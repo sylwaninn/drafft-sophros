@@ -7,7 +7,7 @@
 import { data } from "react-router";
 import { staffContext } from "~/lib/context";
 import { DbError, rpc } from "~/lib/.server/db";
-import { refusalMessage, refusals as errors, type RefusalCode } from "~/lib/refusals";
+import { refusalMessage, refusals, type RefusalCode } from "~/lib/refusals";
 import { deleteMessage } from "~/lib/.server/stream";
 import { DETAILS_MAX, isOverrideBasis, reasonCategories, RESOLUTION_MAX, type Told } from "~/lib/reasons";
 import type { Staff } from "~/lib/roles";
@@ -19,7 +19,7 @@ export type ActResult = { ok: true; message?: string } | { ok: false; error: str
 /** A refusal decided here, before the database: codes and messages like its own. */
 export class Refusal extends Error {
   constructor(readonly code: RefusalCode) {
-    super(errors[code]);
+    super(refusals[code]);
   }
 }
 
@@ -130,7 +130,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         return result({ ok: true, message: text("close") === "true" ? "Reply sent, request closed." : "Reply sent." });
       case "events-replay": {
         const ids = eventIds(form);
-        if (!ids) return result({ ok: false, error: errors.invalid_ids }, 400);
+        if (!ids) return result({ ok: false, error: refusals.invalid_ids }, 400);
         const count = await rpc<number>(staff, "admin_replay_events", { p_ids: ids, p_reason: text("reason") || null });
         return result({
           ok: true,
@@ -139,7 +139,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
       case "events-discard": {
         const ids = eventIds(form);
-        if (!ids) return result({ ok: false, error: errors.invalid_ids }, 400);
+        if (!ids) return result({ ok: false, error: refusals.invalid_ids }, 400);
         const count = await rpc<number>(staff, "admin_discard_events", { p_ids: ids, p_reason: text("reason") });
         return result({
           ok: true,

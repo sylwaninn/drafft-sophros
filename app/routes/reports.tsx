@@ -127,6 +127,18 @@ const reportHolds: { state: Hold; label: string }[] = [
   { state: "banned", label: "Ban" },
 ];
 
+/** What closing the report does, with the hold chosen. */
+function closingDescription(hold: Hold | "none"): string {
+  switch (hold) {
+    case "none":
+      return "The resolution goes to the audit log. Nobody is told.";
+    case "banned":
+      return "The ban applies at once: the account closes for good, and its email, phone and sign-ins can't come back. They're told why.";
+    default:
+      return "The hold applies at once, and they're told why. The resolution goes to the audit log.";
+  }
+}
+
 function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: () => void }) {
   const { staff } = useRoot();
   const [hold, setHold] = useState<Hold | "none">("none");
@@ -208,13 +220,7 @@ function ReportSheet({ report: r, onClose }: { report: Report | null; onClose: (
                     placeholder="What you found and did"
                     destructive={ban}
                     title={ban ? `Ban ${r.reported.name ?? "this account"} and close the report` : "Close the report"}
-                    description={
-                      ban
-                        ? "The ban applies at once: the account closes for good, and its email, phone and sign-ins can't come back. They're told why."
-                        : hold === "none"
-                          ? "The resolution goes to the audit log. Nobody is told."
-                          : "The hold applies at once, and they're told why. The resolution goes to the audit log."
-                    }
+                    description={closingDescription(hold)}
                     submit={ban ? "Ban and close" : "Close the report"}
                     trigger={
                       <Button className="w-full" variant={ban ? "destructive" : "default"}>

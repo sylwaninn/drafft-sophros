@@ -64,6 +64,16 @@ export function useAct({ onDone }: { onDone?: () => void } = {}) {
   return { fetcher, pending: fetcher.state !== "idle" };
 }
 
+/**
+ * The refusal of the last try made since the calling form mounted, until the next try: shown in the form,
+ * which stays open. An answer from before it opened doesn't count.
+ */
+export function useRefusal(fetcher: ReturnType<typeof useAct>["fetcher"]): string | null {
+  const [before] = useState(fetcher.data);
+  const answer = fetcher.state === "idle" && fetcher.data !== before ? fetcher.data : undefined;
+  return answer && !answer.ok ? answer.error : null;
+}
+
 function Hidden({ intent, fields }: { intent: string; fields: Fields }) {
   return (
     <>
@@ -236,10 +246,7 @@ function ReasonForm({
   const [told, setTold] = useState<Statement>({ category: statement?.category });
   const toldReady = useStatementReady(told);
   const ready = !statement || toldReady;
-  // The last refusal since this opening, shown in the dialog (it stays open), until the next try.
-  const [before] = useState(fetcher.data);
-  const answer = fetcher.state === "idle" && fetcher.data !== before ? fetcher.data : undefined;
-  const refused = answer && !answer.ok ? answer.error : null;
+  const refused = useRefusal(fetcher);
   return (
     <fetcher.Form method="post" action="/act" defaultShouldRevalidate className="grid gap-6">
       <Hidden intent={intent} fields={fields} />

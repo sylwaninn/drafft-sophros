@@ -88,12 +88,10 @@ function Conversation({ matchId, from }: { matchId: string; from: string }) {
   const open = (override: OverrideBasis | null) => {
     const typed = reason.trim();
     if (!typed) return;
-    setAsked({ reason: typed, overrideBasis: override });
+    const next = { reason: typed, overrideBasis: override };
+    setAsked(next);
     // Nothing else on the page reloads: no other read is logged.
-    reading.submit(
-      { reason: typed, from, override: String(override !== null), override_basis: override ?? "" },
-      { method: "post", action: `/conversation-data/${matchId}`, defaultShouldRevalidate: false },
-    );
+    reading.submit(readFields(next, from), { method: "post", action: `/conversation-data/${matchId}`, defaultShouldRevalidate: false });
   };
 
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -104,13 +102,7 @@ function Conversation({ matchId, from }: { matchId: string; from: string }) {
       // Logged like the first page, with the same reason (a plain request: nothing else reloads).
       const res = await fetch(`/conversation-data/${matchId}`, {
         method: "POST",
-        body: new URLSearchParams({
-          reason: asked.reason,
-          from: `${from}, older messages`,
-          override: String(asked.overrideBasis !== null),
-          override_basis: asked.overrideBasis ?? "",
-          before: messages[0].id,
-        }),
+        body: new URLSearchParams({ ...readFields(asked, `${from}, older messages`), before: messages[0].id }),
       });
       const answer = await olderMessages(res);
       if (!answer.ok) return void toast.error(answer.error);
@@ -253,6 +245,16 @@ interface Asked {
   overrideBasis: OverrideBasis | null;
 }
 
+/** A reading as conversation-data takes it, from where it was opened. */
+function readFields(asked: Asked, from: string): Record<string, string> {
+  return {
+    reason: asked.reason,
+    from,
+    override: String(asked.overrideBasis !== null),
+    override_basis: asked.overrideBasis ?? "",
+  };
+}
+
 /** Why the team may read it, as the database sees it; or the override it was opened with. */
 function BasisBadges({ access, override }: { access: ConversationAccess; override: OverrideBasis | null }) {
   if (access.basis.length === 0) {
@@ -304,6 +306,7 @@ function ReadGate({
   const [overrideBasis, setOverrideBasis] = useState<OverrideBasis | null>(null);
   const typed = reason.trim();
   const basis = access.basis.length > 0;
+  const ReadIcon = basis ? MessagesSquareIcon : ShieldAlertIcon;
   const submit = () => {
     if (!typed || pending) return;
     if (basis) onOpen(null);
@@ -368,13 +371,7 @@ function ReadGate({
             )}
           </Field>
           <Button type="submit" variant={basis ? "default" : "destructive"} disabled={!typed || pending} className="w-fit">
-            {pending ? (
-              <Spinner data-icon="inline-start" />
-            ) : basis ? (
-              <MessagesSquareIcon data-icon="inline-start" />
-            ) : (
-              <ShieldAlertIcon data-icon="inline-start" />
-            )}
+            {pending ? <Spinner data-icon="inline-start" /> : <ReadIcon data-icon="inline-start" />}
             {basis ? "Read the conversation" : "Read without a basis"}
           </Button>
         </form>

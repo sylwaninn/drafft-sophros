@@ -25,7 +25,7 @@ import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
 import { REASON_MAX, type Statement, type Told } from "~/lib/reasons";
 import type { Decision } from "~/routes/act";
-import { useAct } from "./act";
+import { useAct, useRefusal } from "./act";
 import { StatementFields, useStatementReady } from "./statement-fields";
 import { typingIn, useLetterShortcuts } from "./shortcuts";
 
@@ -276,10 +276,7 @@ function ReasonPrompt<T>({
   const prompt = action.prompt!;
   const toldReady = useStatementReady(told);
   const ready = Boolean(reason.trim()) && (!action.statement || toldReady) && !pending;
-  // The refusal of a try made from this prompt, shown in it until the next one.
-  const [before] = useState(fetcher.data);
-  const answer = fetcher.state === "idle" && fetcher.data !== before ? fetcher.data : undefined;
-  const refused = answer && !answer.ok ? answer.error : null;
+  const refused = useRefusal(fetcher);
   const submit = () => {
     if (!ready) return;
     const details = told.details?.trim();

@@ -39,6 +39,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 const why = (f: Flag) => `photo shared in a chat: ${f.labels.join(", ")}`;
 // A hold the account already has would tell them nothing new: that choice isn't offered.
 const holdable = (state: Hold) => (f: Flag) => !!f.person && !f.person.deleted && holdChanges(f.person.moderation, state);
+// The flag closes with `reason`; the reason typed goes to the hold, with what they're told.
+const holdDecision =
+  (hold: Hold, reason: string): ReviewAction<Flag>["decide"] =>
+  (f, answer) => ({ intent: "flags", ids: [f.id], reason, hold, holdReason: answer.reason, ...toldIn(answer) });
 
 const actions: ReviewAction<Flag>[] = [
   {
@@ -63,14 +67,7 @@ const actions: ReviewAction<Flag>[] = [
     statement: {},
     reason: why,
     done: "Account held for review.",
-    decide: (f, answer) => ({
-      intent: "flags",
-      ids: [f.id],
-      reason: "account held for review",
-      hold: "review",
-      holdReason: answer.reason,
-      ...toldIn(answer),
-    }),
+    decide: holdDecision("review", "account held for review"),
   },
   {
     id: "selfie",
@@ -85,14 +82,7 @@ const actions: ReviewAction<Flag>[] = [
     statement: { category: suggestedCategory("selfie") },
     reason: why,
     done: "Selfie asked: the account is frozen until they send it.",
-    decide: (f, answer) => ({
-      intent: "flags",
-      ids: [f.id],
-      reason: "selfie asked",
-      hold: "selfie",
-      holdReason: answer.reason,
-      ...toldIn(answer),
-    }),
+    decide: holdDecision("selfie", "selfie asked"),
   },
   {
     id: "ban",
@@ -108,14 +98,7 @@ const actions: ReviewAction<Flag>[] = [
     },
     statement: {},
     done: "Account banned.",
-    decide: (f, answer) => ({
-      intent: "flags",
-      ids: [f.id],
-      reason: "account banned",
-      hold: "banned",
-      holdReason: answer.reason,
-      ...toldIn(answer),
-    }),
+    decide: holdDecision("banned", "account banned"),
   },
 ];
 
