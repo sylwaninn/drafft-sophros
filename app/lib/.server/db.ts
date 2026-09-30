@@ -62,15 +62,16 @@ export async function query<T>(staff: Staff, fn: `admin_${string}`, args: Record
   }
 }
 
-/** Short-lived URL for a private object (verification selfies). */
-export async function signedUrl(bucket: string, path: string, expiresIn = 300): Promise<string | null> {
+/** Short-lived URL for a private object (verification selfies). Throws when Storage doesn't give one. */
+export async function signedUrl(bucket: string, path: string, expiresIn = 300): Promise<string> {
   const { supabaseUrl, supabaseKey } = getConfig();
   const res = await fetch(`${supabaseUrl}/storage/v1/object/sign/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`, {
     method: "POST",
     headers: { apikey: supabaseKey, authorization: `Bearer ${supabaseKey}`, "content-type": "application/json" },
     body: JSON.stringify({ expiresIn }),
   });
-  if (!res.ok) return null;
+  if (!res.ok) throw new Error(`storage sign ${bucket}: HTTP ${res.status}`);
   const { signedURL } = (await res.json()) as { signedURL?: string };
-  return signedURL ? `${supabaseUrl}/storage/v1${signedURL}` : null;
+  if (!signedURL) throw new Error(`storage sign ${bucket}: no URL in the answer`);
+  return `${supabaseUrl}/storage/v1${signedURL}`;
 }

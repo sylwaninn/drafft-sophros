@@ -1,4 +1,5 @@
 import { useRouteLoaderData } from "react-router";
+import type { ReasonCategory } from "~/lib/reasons";
 import type { Staff } from "~/lib/roles";
 
 export type Theme = "dark" | "light";
@@ -21,6 +22,8 @@ export interface RootData {
   queues: Record<"selfies" | "reviews" | "selfieOwed" | "reports" | "support" | "exports" | "photos" | "flags", QueueCount>;
   /** When the server read `holds` and `queues`. */
   countedAt: string;
+  /** The reason categories a decision is told with (admin_reason_categories); empty if they couldn't be read. */
+  reasonCategories: ReasonCategory[];
 }
 
 export function useRoot(): RootData {

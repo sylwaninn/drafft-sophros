@@ -1,6 +1,20 @@
 // Shapes returned by the admin_* functions (jsonb), as the dashboard reads them.
 
-export type Hold = "review" | "selfie" | "banned";
+/** The holds an account can be under, strictest last. */
+export const HOLDS = ["review", "selfie", "banned"] as const;
+export type Hold = (typeof HOLDS)[number];
+
+export function isHold(value: unknown): value is Hold {
+  return (HOLDS as readonly unknown[]).includes(value);
+}
+
+/**
+ * Whether putting `next` on an account changes its hold: not on a banned account (lifting a ban takes
+ * an admin, from its page), and not the hold it already has (nothing would be recorded, nor told).
+ */
+export function holdChanges(current: Hold | null | undefined, next: Hold): boolean {
+  return current !== "banned" && current !== next;
+}
 
 export interface Person {
   id: string;
@@ -102,8 +116,28 @@ export interface SupportRequest {
   handled_at: string | null;
   handled_by: string | null;
   person: Person | null;
-  replies: { id: number; author: string; body: string; createdAt: string; sentAt: string | null; error: string | null }[];
+  /** The thread under the first message, oldest first: the team's replies and the member's emails. */
+  replies: SupportMessage[];
 }
+
+/** A message of a support thread (admin_support): the team's reply or the member's email. */
+export type SupportMessage = TeamReply | MemberEmail;
+
+interface ThreadMessage {
+  id: number;
+  body: string;
+  createdAt: string;
+}
+
+/** Written in sophros by a staff member (`author`) and emailed by the backend: sending until `sentAt` or `error` is
+ * set, never both. */
+export type TeamReply = ThreadMessage & { direction: "out"; author: string } & (
+    { sentAt: null; error: null } | { sentAt: string; error: null } | { sentAt: null; error: string }
+  );
+
+/** Written by the member and received by email (drafft-backend, "Support by email"): `author` is the sender's
+ * address, `sentAt` when it arrived; nothing to send, so never an error. */
+export type MemberEmail = ThreadMessage & { direction: "in"; author: string; sentAt: string; error: null };
 
 export interface DataRequest {
   id: number;
@@ -197,7 +231,23 @@ export interface AccountDeletion {
   moderation: Hold | null;
   reports: { id: string; reason: string; createdAt: string; handledAt: string | null; resolution: string | null }[];
   holds: { state: Hold; note: string | null; createdAt: string }[];
-  identities: { email?: string | null; phone?: string | null; oauth?: { provider: string; email: string | null }[] };
+  /** Which sign-in identities existed, never their values; `{}` once the retention purge cleared them. */
+  identities: DeletionIdentities | Record<string, never>;
+  /** When the retention purge cleared `identities`; absent while admin_account_deletion doesn't return it. */
+  identitiesPurgedAt?: string | null;
+}
+
+/** An Apple or Google sign-in of a deleted account: the provider and its dates, no provider id or email. */
+export interface DeletionOAuthSignIn {
+  provider: string;
+  createdAt: string | null;
+  lastSignInAt: string | null;
+}
+
+export interface DeletionIdentities {
+  email: boolean;
+  phone: boolean;
+  oauth: DeletionOAuthSignIn[];
 }
 
 export interface UserDetail {

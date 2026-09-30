@@ -1,5 +1,6 @@
 // A review queue: one item at a time, large, with everything needed to decide next to it. A decision
-// applies at once (keyboard letter or button); the item leaves and the next one slides in.
+// applies at once (keyboard letter or button), or asks first when it needs a reason (a ban) or tells the
+// member why (a refused photo, a hold); the item leaves and the next one slides in.
 import { useCallback, useEffect, useEffectEvent, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { type LucideIcon, ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon } from "lucide-react";
@@ -17,13 +18,15 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "~/components/ui/empty";
-import { Field, FieldDescription, FieldLabel } from "~/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "~/components/ui/field";
 import { Kbd, KbdGroup } from "~/components/ui/kbd";
 import { Label } from "~/components/ui/label";
 import { Spinner } from "~/components/ui/spinner";
 import { Textarea } from "~/components/ui/textarea";
+import { REASON_MAX, type Statement, type Told } from "~/lib/reasons";
 import type { Decision } from "~/routes/act";
-import { useAct } from "./act";
+import { useAct, useRefusal } from "./act";
+import { StatementFields, useStatementReady } from "./statement-fields";
 import { typingIn, useLetterShortcuts } from "./shortcuts";
 
 export interface ReviewAction<T> {
@@ -34,14 +37,31 @@ export interface ReviewAction<T> {
   icon: LucideIcon;
   variant?: "default" | "outline" | "secondary" | "destructive";
   available?: (item: T) => boolean;
-  /** Asked first (a ban): the reason is required and goes to the audit log. */
+  /** Asked first (a ban, or anything the member is told): the reason is required and goes to the audit log. */
   prompt?: { title: (item: T) => string; description: string; destructive?: boolean; placeholder?: string };
-  /** The reason written for the reviewer when none is asked. */
+  /**
+   * The member is told this decision and why: the prompt also asks for the reason category they're told
+   * (preselected with `category`) and a note for them. Needs `prompt`.
+   */
+  statement?: { category?: string };
+  /** The reason written for the reviewer when none is asked; the prompt starts from it when one is. */
   reason?: (item: T) => string;
   /** What the toast says once it's done. */
   done: string;
   /** The decision, applied whole in one database transaction. */
-  decide: (item: T, reason: string) => Decision;
+  decide: (item: T, answer: Answer) => Decision;
+}
+
+/** What a decision was given: the internal reason, and what the member is told when they are. */
+export interface Answer {
+  reason: string;
+  told?: Told;
+}
+
+/** What the member is told, for a decision with a `statement` (its prompt doesn't confirm without one). */
+export function toldIn(answer: Answer): Told {
+  if (!answer.told) throw new Error("this decision tells the member why: its prompt asks for the reason first");
+  return answer.told;
 }
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -70,12 +90,17 @@ export function ReviewQueue<T>({
 }) {
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
-  const [prompting, setPrompting] = useState<ReviewAction<T> | null>(null);
-  const { fetcher, pending } = useAct();
+  // The decision asked first, and the item it's for: it stays open until the decision applies, so a
+  // refusal keeps what was typed.
+  const [prompting, setPrompting] = useState<{ action: ReviewAction<T>; item: T } | null>(null);
+  const closePrompt = useCallback(() => setPrompting(null), []);
+  const { fetcher, pending } = useAct({ onDone: closePrompt });
 
   // The item decided on leaves the list: the same position now holds the next one.
   const at = Math.min(index, Math.max(items.length - 1, 0));
   const current = items[at];
+  // Decided by someone else meanwhile (the list reloads after a refusal too): nothing left to ask about.
+  const promptItem = prompting && items.find((i) => getId(i) === getId(prompting.item));
 
   const go = useCallback(
     (to: number) => {
@@ -87,11 +112,11 @@ export function ReviewQueue<T>({
   );
 
   const run = useCallback(
-    (action: ReviewAction<T>, item: T, reason: string) => {
+    (action: ReviewAction<T>, item: T, answer: Answer) => {
       setDirection(1);
       // Reloaded even when refused: the item may have been decided on by someone else meanwhile.
       fetcher.submit(
-        { intent: "decide", message: action.done, decision: JSON.stringify(action.decide(item, reason)) },
+        { intent: "decide", message: action.done, decision: JSON.stringify(action.decide(item, answer)) },
         { method: "post", action: "/act", defaultShouldRevalidate: true },
       );
     },
@@ -101,8 +126,8 @@ export function ReviewQueue<T>({
   const decide = useCallback(
     (action: ReviewAction<T>) => {
       if (!current || pending || (action.available && !action.available(current))) return;
-      if (action.prompt) setPrompting(action);
-      else run(action, current, action.reason?.(current) ?? "");
+      if (action.prompt) setPrompting({ action, item: current });
+      else run(action, current, { reason: action.reason?.(current) ?? "" });
     },
     [current, pending, run],
   );
@@ -210,7 +235,7 @@ export function ReviewQueue<T>({
               {letters && (
                 <>
                   <Kbd>{shown.map((a) => a.key.toUpperCase()).join(" ")}</Kbd>
-                  it applies at once, then the next one comes
+                  it applies at once, or asks first when they're told why, then the next one comes
                 </>
               )}
             </span>
@@ -219,36 +244,48 @@ export function ReviewQueue<T>({
         <div className="space-y-6">{aside(current)}</div>
       </div>
 
-      {prompting && (
+      {prompting && promptItem && (
         <ReasonPrompt
-          action={prompting}
-          item={current}
-          onCancel={() => setPrompting(null)}
-          onConfirm={(reason) => {
-            run(prompting, current, reason);
-            setPrompting(null);
-          }}
+          action={prompting.action}
+          item={promptItem}
+          act={{ fetcher, pending }}
+          onCancel={closePrompt}
+          onConfirm={(answer) => run(prompting.action, promptItem, answer)}
         />
       )}
     </MotionConfig>
   );
 }
 
-/** The reason a decision needs first (a ban). */
+/** What a decision needs first: a reason (a ban), and what the member is told when they are. */
 function ReasonPrompt<T>({
   action,
   item,
+  act: { fetcher, pending },
   onCancel,
   onConfirm,
 }: {
   action: ReviewAction<T>;
   item: T;
+  act: ReturnType<typeof useAct>;
   onCancel: () => void;
-  onConfirm: (reason: string) => void;
+  onConfirm: (answer: Answer) => void;
 }) {
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(() => action.reason?.(item) ?? "");
+  const [told, setTold] = useState<Statement>({ category: action.statement?.category });
   const prompt = action.prompt!;
-  const submit = () => reason.trim() && onConfirm(reason.trim());
+  const toldReady = useStatementReady(told);
+  const ready = Boolean(reason.trim()) && (!action.statement || toldReady) && !pending;
+  const refused = useRefusal(fetcher);
+  const submit = () => {
+    if (!ready) return;
+    const details = told.details?.trim();
+    onConfirm(
+      action.statement && told.category
+        ? { reason: reason.trim(), told: { category: told.category, details: details || undefined } }
+        : { reason: reason.trim() },
+    );
+  };
   const form = (
     <form
       className="grid gap-6"
@@ -257,29 +294,36 @@ function ReasonPrompt<T>({
         submit();
       }}
     >
-      <Field>
-        <FieldLabel htmlFor="decision-reason">Reason</FieldLabel>
-        <Textarea
-          id="decision-reason"
-          required
-          rows={3}
-          maxLength={1000}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder={prompt.placeholder ?? "What you saw, for the audit log"}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-        />
-        <FieldDescription>Saved with your email in the audit log.</FieldDescription>
-      </Field>
+      <FieldGroup>
+        {action.statement && <StatementFields id="decision" value={told} onChange={setTold} />}
+        <Field>
+          <FieldLabel htmlFor="decision-reason">{action.statement ? "Internal reason" : "Reason"}</FieldLabel>
+          <Textarea
+            id="decision-reason"
+            required
+            rows={3}
+            maxLength={REASON_MAX}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={prompt.placeholder ?? "What you saw, for the audit log"}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+          />
+          <FieldDescription>
+            {action.statement ? "Not sent to them: saved with your email in the audit log." : "Saved with your email in the audit log."}
+          </FieldDescription>
+        </Field>
+        {refused && <FieldError>{refused}</FieldError>}
+      </FieldGroup>
       {prompt.destructive ? (
         <AlertDialogFooter>
           <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-          <Button type="submit" variant="destructive" disabled={!reason.trim()}>
+          <Button type="submit" variant="destructive" disabled={!ready}>
+            {pending && <Spinner data-icon="inline-start" />}
             {action.label}
           </Button>
         </AlertDialogFooter>
@@ -290,7 +334,8 @@ function ReasonPrompt<T>({
               Cancel
             </Button>
           </DialogClose>
-          <Button type="submit" disabled={!reason.trim()}>
+          <Button type="submit" disabled={!ready}>
+            {pending && <Spinner data-icon="inline-start" />}
             {action.label}
           </Button>
         </DialogFooter>
