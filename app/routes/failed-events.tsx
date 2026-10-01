@@ -56,7 +56,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return { ...data, page, more: data.total > (page + 1) * pageSize };
 }
 
-const providerNames: Record<string, string> = { stream: "Stream", apns: "APNs", resend: "Resend", twilio: "Twilio", r2: "R2" };
+const providerNames: Record<string, string> = { stream: "Stream", apns: "APNs", fcm: "FCM", resend: "Resend", twilio: "Twilio", r2: "R2" };
 
 function CircuitBadge({ circuit }: { circuit: Circuit }) {
   const name = providerNames[circuit.provider] ?? circuit.provider;
