@@ -178,10 +178,14 @@ Per environment (`staging` first, then `production`):
    Give sophros its own secret key (Supabase > Settings > API keys) so it can be revoked alone.
 4. Deploys run from GitHub Actions (`.github/workflows/ci.yml`), never from a laptop:
 
-   | Branch    | Deploys              | How it changes                      |
-   | --------- | -------------------- | ----------------------------------- |
-   | `staging` | `sophros-staging`    | pull requests from feature branches |
-   | `main`    | `sophros-production` | pull requests from `staging`        |
+   | Ref       | Deploys              | How it changes                                            |
+   | --------- | -------------------- | --------------------------------------------------------- |
+   | `staging` | `sophros-staging`    | pull requests from feature branches (the default branch)  |
+   | `v*` tags | `sophros-production` | Actions > release: `main` fast-forwards to `staging`, tag |
+
+   The release (`.github/workflows/release.yml`, `scripts/ci/release.sh`) needs staging's head green, picks
+   the next `vX.Y.Z` from the released pull request titles (or the one asked for) and publishes a GitHub
+   release; `ci.yml` then deploys the tag. To roll back, Actions > ci > Run workflow on an older tag.
 
    Every pull request runs: its title (`type(scope): description`), quality (types, ESLint with React hooks
    and accessibility rules, Prettier, tests, build), a dry-run bundle of the Worker for both environments,
