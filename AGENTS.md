@@ -21,8 +21,9 @@ Co-Authored-By, a pull request into `staging`, verify first. The git hooks in `.
 
 Verify before committing: `pnpm verify` (types, ESLint, Prettier, tests, build), as CI does.
 
-Branches: feature branch → pull request into `staging` (deploys staging) → pull request from `staging`
-into `main` (deploys production). **Never push or commit to `staging` or `main`, never use `--no-verify`**:
+Branches: feature branch → pull request into `staging` (the default branch, deploys staging) → Actions >
+release (`scripts/ci/release.sh`: staging's new commits onto `main`, a `vX.Y.Z` tag and a GitHub release,
+then that tag deploys production). **Never push or commit to `staging` or `main`, never use `--no-verify`**:
 the hooks refuse it, and a refusal means changing the approach, not getting around it.
 
 ## Safety
