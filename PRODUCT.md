@@ -8,7 +8,7 @@ web
 
 ## Users
 
-The founder of drafft (a dating app built around sport sessions), moderating alone for now: short desktop
+The founder of drafft (a dating app for people who train), moderating alone for now: short desktop
 sessions to clear the queues, longer ones when an account needs investigating. A small team (support,
 moderators) joins later; roles already exist for them.
 
