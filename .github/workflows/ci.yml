@@ -1,11 +1,13 @@
-# sophros CI: every change is checked; `staging` ships to staging, `main` to production.
+# sophros CI: every change is checked; `staging` ships to staging, a release tag to production.
 #
 #   pull request     → PR title, quality (types, lint, format, tests, build), bundles for both
 #                      environments, security (dependencies, secrets, workflows)
 #   push to staging  → the same checks, then deploy sophros-staging and smoke-test it behind Access
-#   push to main     → the same checks, then deploy sophros-production and smoke-test it behind Access
+#   v* tag           → the same checks, then deploy sophros-production and smoke-test it behind Access.
+#                      release.yml starts it on the tag it creates; Run workflow on an older tag rolls
+#                      back to it.
 #
-# Flow: feature branch → PR into staging → PR from staging into main.
+# Flow: feature branch → pull request into staging → release.yml (staging → main, tag, deploy).
 # Wrangler needs the secret CLOUDFLARE_API_TOKEN and the variable CLOUDFLARE_ACCOUNT_ID. The Workers'
 # own secrets (SUPABASE_SECRET_KEY, STREAM_API_*) live in Cloudflare (`wrangler secret put`).
 # Third-party actions are pinned to a commit; Dependabot bumps them.
@@ -13,9 +15,12 @@ name: ci
 
 on:
   pull_request:
-    branches: [staging, main]
+    branches: [staging]
   push:
-    branches: [staging, main]
+    branches: [staging]
+  # Production: run on a v* tag. release.yml does it for the tag it creates; by hand, on an older tag, it
+  # rolls back. Not on tag pushes: a tag-triggered run counts as a release, where shared caches are unsafe.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -157,7 +162,7 @@ jobs:
 
   deploy-production:
     name: deploy production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [quality, bundle, security]
     runs-on: ubuntu-latest
     timeout-minutes: 10
