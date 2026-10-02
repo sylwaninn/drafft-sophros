@@ -636,10 +636,10 @@ function ActivityTab({ u }: { u: UserDetail }) {
               ["Sessions", String(u.stats.sessions)],
               ["Push", u.pushTokens.map((t) => t.environment).join(", ") || null],
               [
-                "DeviceCheck",
+                "Device check",
                 u.deviceCheck ? (
                   <span key="dc" className="inline-flex items-center gap-1.5">
-                    {u.deviceCheck.environment}
+                    {u.deviceCheck.platform === "android" ? "Play Integrity" : "Apple DeviceCheck"}, {u.deviceCheck.environment}
                     {u.deviceCheck.flaggedAt && <Badge variant="destructive">Flagged device</Badge>}
                   </span>
                 ) : null,
