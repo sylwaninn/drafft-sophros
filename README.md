@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/sticker.png" alt="drafft-sophros" width="140">
+</p>
+
 # sophros
 
 The drafft team's moderation and support dashboard: accounts, holds and bans, selfie checks, reports,
