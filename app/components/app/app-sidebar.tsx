@@ -29,7 +29,7 @@ import { isActive, navGroups, useVisibleNav, type NavItem } from "./nav";
 import { useRoot } from "./root-data";
 
 const envBadge = {
-  local: "secondary",
+  dev: "secondary",
   staging: "outline",
   production: "destructive",
 } as const;

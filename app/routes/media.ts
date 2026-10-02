@@ -13,10 +13,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   if (!MEDIA_KEY.test(key)) throw data("Not found.", { status: 404 });
   const config = getConfig();
   const width = Number(new URL(request.url).searchParams.get("w")) || undefined;
-  const target =
-    config.demoMediaUrl && key.includes("/demo/")
-      ? `${config.demoMediaUrl}/${key}`
-      : await mediaLink(config.mediaUrl, config.mediaSigningKey, key, width);
+  const target = await mediaLink(config.mediaUrl, config.mediaSigningKey, key, width);
   // Kept by this browser only, well within the link's life.
   return redirect(target, { status: 302, headers: { "Cache-Control": "private, max-age=600", "Referrer-Policy": "no-referrer" } });
 }

@@ -11,9 +11,8 @@ export interface QueueCount {
 
 export interface RootData {
   staff: Staff;
-  env: "local" | "staging" | "production";
+  env: "dev" | "staging" | "production";
   mediaUrl: string;
-  demoMediaUrl: string | null;
   theme: Theme;
   sidebarOpen: boolean;
   /** Whether single-letter shortcuts decide in the review queues. */
@@ -34,10 +33,8 @@ export function useRoot(): RootData {
 
 /**
  * A media key's link in sophros: `/media/<key>`, which redirects to a freshly signed URL (the bucket is
- * private). Demo keys come straight from the local Storage.
+ * private).
  */
 export function useMediaUrl() {
-  const { demoMediaUrl } = useRoot();
-  return (key: string | null | undefined) =>
-    key ? (demoMediaUrl && key.includes("/demo/") ? `${demoMediaUrl}/${key}` : `/media/${key}`) : undefined;
+  return (key: string | null | undefined) => (key ? `/media/${key}` : undefined);
 }

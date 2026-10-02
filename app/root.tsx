@@ -62,7 +62,6 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Ro
     staff,
     env: config.env,
     mediaUrl: config.mediaUrl,
-    demoMediaUrl: config.demoMediaUrl,
     theme: cookie(request, "theme") === "light" ? "light" : "dark",
     sidebarOpen: cookie(request, "sidebar_state") !== "false",
     letterShortcuts: letterShortcutsOn(cookie(request, letterShortcutsCookie)),

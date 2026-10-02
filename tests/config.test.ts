@@ -19,18 +19,17 @@ describe("loadConfig", () => {
     expect(config.stream).toBeNull();
   });
 
-  it("refuses the dev identity outside the local database", () => {
-    expect(() => loadConfig({ ...production, AUTH_MODE: "dev", DEV_STAFF_EMAIL: "me@x.dev" })).toThrow(/local only/);
-    expect(() => loadConfig({ ...production, DRAFFT_ENV: "staging", AUTH_MODE: "dev", DEV_STAFF_EMAIL: "me@x.dev" })).toThrow(/local only/);
+  it("refuses the dev identity outside the dev server", () => {
+    expect(() => loadConfig({ ...production, AUTH_MODE: "dev", DEV_STAFF_EMAIL: "me@x.dev" })).toThrow(/dev only/);
+    expect(() => loadConfig({ ...production, DRAFFT_ENV: "staging", AUTH_MODE: "dev", DEV_STAFF_EMAIL: "me@x.dev" })).toThrow(/dev only/);
   });
 
-  it("allows it locally", () => {
+  it("allows it on the dev server", () => {
     const config = loadConfig({
       ...production,
-      DRAFFT_ENV: "local",
+      DRAFFT_ENV: "dev",
       AUTH_MODE: "dev",
       DEV_STAFF_EMAIL: "Me@X.dev",
-      SUPABASE_URL: "http://127.0.0.1:55421",
     });
     expect(config.auth).toEqual({ mode: "dev", email: "me@x.dev" });
   });
@@ -39,7 +38,7 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...production, ACCESS_AUD: "" })).toThrow(/ACCESS_AUD/);
   });
 
-  it("refuses a plain http database outside local", () => {
+  it("refuses a plain http database", () => {
     expect(() => loadConfig({ ...production, SUPABASE_URL: "http://ref.supabase.co" })).toThrow(/https/);
   });
 });

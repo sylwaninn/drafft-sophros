@@ -1,15 +1,13 @@
 // A conversation for the drawer, in two steps. GET: the match and its sessions, and whether it may be
 // read (admin_conversation_access: its basis, and whether this person may do without one); no message,
-// nothing logged. POST: its messages (Stream, or the canned demo ones locally), once the reading is
+// nothing logged. POST: its messages (Stream), once the reading is
 // logged on both accounts' trail (admin_log conversation.view) with the reason the person typed and
 // where it was opened from. The database refuses a reading without a reason, or without a basis unless
 // an admin overrides it (and says why: a legal request or members' safety); the refusal comes back as
 // `{ ok: false }` for the drawer to explain.
 import { data } from "react-router";
 import { staffContext } from "~/lib/context";
-import { getConfig } from "~/lib/.server/config";
 import { DbError, query, rpc } from "~/lib/.server/db";
-import { demoMessages } from "~/lib/.server/demo-chat";
 import { refusalMessage, refusals } from "~/lib/refusals";
 import { channelMessages, type ChatMessage } from "~/lib/.server/stream";
 import { auditedReason, conversationAccess, isOverrideBasis, READ_REASON_MAX, typedReason, type ConversationAccess } from "~/lib/reasons";
@@ -99,9 +97,6 @@ export async function action({ params, request, context }: Route.ActionArgs) {
         : (readRefusals[error.code] ?? refusalMessage(error.code) ?? error.message);
     return refused(error.code, message, error.status === 403 ? 403 : 400);
   }
-  const config = getConfig();
-  const demo = config.env === "local" && !config.stream ? demoMessages(match.a.id, match.b.id, config.demoMediaUrl) : null;
-  if (demo) return read({ ok: true, messages: { exists: true, messages: demo, hasMore: false } });
   try {
     return read({ ok: true, messages: await channelMessages(match.id, 80, text("before") || undefined) });
   } catch (error) {

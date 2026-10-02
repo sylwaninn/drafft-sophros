@@ -5,7 +5,7 @@
 
 /** The keys drafft issues: u/<user>/<folder>/<name>.<ext>. */
 export const MEDIA_KEY =
-  /^u\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(photos|demo|videos|posters|voice|chat)\/[A-Za-z0-9_-]{1,64}\.(jpg|heic|png|mp4|mov|m4a|aac|pdf|bin)$/;
+  /^u\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(photos|videos|posters|voice|chat)\/[A-Za-z0-9_-]{1,64}\.(jpg|heic|png|mp4|mov|m4a|aac|pdf|bin)$/;
 
 /** The widths the Worker resizes to; anything else is left out. */
 export const MEDIA_WIDTHS = new Set([160, 320, 640, 1080]);

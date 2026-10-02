@@ -5,7 +5,6 @@ import type { EntryContext, RouterContextProvider } from "react-router";
 import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
-import { getConfig } from "~/lib/.server/config";
 
 export const streamTimeout = 5_000;
 
@@ -39,14 +38,9 @@ export default async function handleRequest(
   }
 
   const dev = import.meta.env.DEV;
-  // Media hosts that aren't https (the local Storage, with the demo pictures and selfies).
-  const config = getConfig();
-  const plain = [config.supabaseUrl, config.demoMediaUrl, config.mediaUrl]
-    .filter((u): u is string => !!u && u.startsWith("http:"))
-    .map((u) => new URL(u).origin);
   const page = new URL(request.url);
   const liveOrigin = `${page.protocol === "https:" ? "wss:" : "ws:"}//${page.host}`;
-  const media = ["'self'", "data:", "blob:", "https:", ...new Set(plain)].join(" ");
+  const media = "'self' data: blob: https:";
   responseHeaders.set("Content-Type", "text/html");
   responseHeaders.set(
     "Content-Security-Policy",
