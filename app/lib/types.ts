@@ -285,7 +285,8 @@ export interface UserDetail {
   devices: Device[];
   ips: { ip: string; country: string | null; first_seen_at: string; last_seen_at: string }[];
   pushTokens: { environment: string; updatedAt: string; token: string }[];
-  deviceCheck: { environment: string; updatedAt: string; flaggedAt: string | null } | null;
+  /** `platform` is missing until the backend that adds it is deployed: read as an iPhone then. */
+  deviceCheck: { platform?: "ios" | "android"; environment: string; updatedAt: string; flaggedAt: string | null } | null;
   moderationLog: { state: Hold | null; note: string | null; actor: string | null; createdAt: string }[];
   marks: { kind: string; state: Hold; createdAt: string }[];
   selfies: { id: number; createdAt: string }[];
