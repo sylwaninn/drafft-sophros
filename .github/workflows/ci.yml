@@ -9,7 +9,7 @@
 #
 # Flow: feature branch → pull request into staging → release.yml (staging → main, tag, deploy).
 # Wrangler needs the secret CLOUDFLARE_API_TOKEN and the variable CLOUDFLARE_ACCOUNT_ID. The Workers'
-# own secrets (SUPABASE_SECRET_KEY, STREAM_API_*) live in Cloudflare (`wrangler secret put`).
+# own secrets (SUPABASE_SECRET_KEY, STREAM_API_*, MEDIA_SIGNING_KEY) live in Cloudflare (`wrangler secret put`).
 # Third-party actions are pinned to a commit; Dependabot bumps them.
 name: ci
 
