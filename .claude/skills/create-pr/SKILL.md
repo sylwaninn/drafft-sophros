@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: Create a feature branch, scoped commits and a pull request in drafft-sophros, following this repository's rules (AGENTS.md, "Repository rules"). Use for any "open a PR", "push this", "create a pull request".
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(./gradlew:*), Bash(python3 scripts/*), Bash(deno:*), Bash(supabase:*), Bash(xcodegen:*), Bash(xcodebuild:*), Bash(swiftlint:*), Read, Grep, Glob
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(./gradlew:*), Bash(python3 scripts/*), Bash(deno:*), Bash(xcodegen:*), Bash(xcodebuild:*), Bash(swiftlint:*), Read, Grep, Glob
 argument-hint: [branch-name] [pr-title]
 ---
 
@@ -26,8 +26,7 @@ logic, UI, i18n, refactors, config/CI, fixes. For each:
 
 ## 3. Verify
 
-Run `pnpm verify`. Zero errors. If a tool is missing (Android SDK, local Supabase not running,
-no macOS on the web), run the rest and say in the pull request what was left to CI.
+Run `pnpm verify`. Zero errors. If a tool is missing (Android SDK, no macOS on the web), run the rest and say in the pull request what was left to CI.
 
 ## 4. Docs, legal, parity
 

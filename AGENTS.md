@@ -76,9 +76,9 @@ reads.
 
 ### Environments
 
-Apps an agent installs or launches always target the local Supabase. Never build, install, deploy or run
-mutations against staging or production unless the user asks for that environment in the current
-request. Compile-only checks are the exception.
+Work against staging only: there is no local Supabase stack. Apps an agent installs or launches, and the dev
+server, always target staging. Never build, install, deploy or run mutations against production unless the
+user asks for production in the current request. Compile-only checks are the exception.
 
 ### Work that spans repositories
 
@@ -110,7 +110,7 @@ the hooks refuse it, and a refusal means changing the approach, not getting arou
 
 - Never read, print or copy `.dev.vars` or any secret. Secrets go in with `wrangler secret put`.
 - Server-only code lives in `app/lib/.server/`; nothing there may be imported by client code.
-- `AUTH_MODE=dev` is for the local database only; never set it on a deployed environment.
+- `AUTH_MODE=dev` is for the dev server on localhost only (`DRAFFT_ENV=dev`, against staging); never set it on a deployed environment.
 - Never deploy (`pnpm run deploy:*`) unless the user asks for that environment in the current request.
-- Actions run against real data, even locally (the Drafft Local app uses the same database): test
-  mutations on throwaway accounts only.
+- Actions run against real data, even from the dev server (it works against staging, which the apps' staging
+  builds share): test mutations on throwaway accounts only.

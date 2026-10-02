@@ -1,7 +1,7 @@
 // Who is asking. In staging and production, Cloudflare Access stands in front of the Worker (SSO, MFA,
 // the team's policy) and signs each request with a JWT; it is verified here too, so a request that
 // reached the Worker some other way is refused. Then the database says whether that email is staff, and
-// with which role. Locally (AUTH_MODE=dev, local database only), the identity is DEV_STAFF_EMAIL.
+// with which role. On the dev server (AUTH_MODE=dev, localhost only, against staging), the identity is DEV_STAFF_EMAIL.
 import { createRemoteJWKSet, errors, jwtVerify } from "jose";
 import type { Role, Staff } from "~/lib/roles";
 import { getConfig } from "./config";

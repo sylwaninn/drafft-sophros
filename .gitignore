@@ -15,7 +15,6 @@ worker-configuration.d.ts
 
 !.dev.vars.example
 !.env.example
-.demo-cache/
 
 # Claude Code: personal and per-session files
 .claude/settings.local.json
