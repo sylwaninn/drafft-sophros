@@ -5,7 +5,7 @@
  *   pnpm run deploy:staging      sophros-staging    → staging project
  *   pnpm run deploy:production   sophros-production → production project
  *
- * Secrets, per environment, never in this file (README, "Deploying"):
+ * Secrets, per environment, never in this file (docs/deployment.md, "Secrets"):
  *   wrangler secret put SUPABASE_SECRET_KEY --env <env>
  *   wrangler secret put STREAM_API_KEY --env <env>
  *   wrangler secret put STREAM_API_SECRET --env <env>
