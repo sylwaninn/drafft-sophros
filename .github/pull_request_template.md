@@ -29,8 +29,8 @@ Delete these comments and any section that doesn't apply.
 
 ## Notes
 
-- **Telemetry:** <!-- events, screens, errors and alerts added (docs/telemetry.md), or "none, because ..." -->
-- **Wording:** <!-- strings added or changed in the 7 languages after WORDING.md section 10, or "no user-facing text" -->
+- **Telemetry:** <!-- Sentry errors and PostHog events added for sophros, flows the apps must track, or "none, because ..." -->
+- **Wording:** <!-- text staff or users read, written with the wording skill (drafft-ios/WORDING.md), or "no text" -->
 - **Privacy:** <!-- new personal data, third party or retention change (legal pages in drafft-web), or "none" -->
 - **Companion pull requests:** <!-- the other drafft repositories, or "none" -->
 - **Backend:** <!-- admin_* functions or migrations this relies on (drafft-backend pull request), or "none" -->
