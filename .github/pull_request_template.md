@@ -21,7 +21,7 @@ Delete these comments and any section that doesn't apply.
 <!-- What you ran and what you saw. Say what you did not run. -->
 
 - [ ] `pnpm verify` (types, ESLint, Prettier, tests, build)
-- [ ] Run locally against the local backend, steps: 1.
+- [ ] Run on the dev server against staging, steps: 1.
 
 ## Screenshots
 

@@ -14,8 +14,8 @@ moderators) joins later; roles already exist for them.
 
 ## Product Purpose
 
-sophros is drafft's moderation and support console, one deployment per environment (local, staging,
-production). It exists so every safety decision on drafft is quick to make, well informed, and
+sophros is drafft's moderation and support console, one deployment per environment (staging,
+production), plus the dev server against staging. It exists so every safety decision on drafft is quick to make, well informed, and
 justified: clear the queues, investigate an account before acting, answer members, and prove afterwards
 who did what and why. Success is an empty queue with no wrong ban, and an audit trail that answers any
 question about a decision.
@@ -42,7 +42,7 @@ append-only audit log.
   (DSA statement of reasons). The internal reason never reaches them.
 - A conversation opens only on a basis on record: a report between the two, a help request from either,
   or a hold on either account. Without one, only an admin reads it, as a logged override.
-- Desktop browser, behind Cloudflare Access; the environment (local, staging, production) must be
+- Desktop browser, behind Cloudflare Access; the environment (dev, staging, production) must be
   unmistakable.
 
 ## Capabilities and Constraints
@@ -52,7 +52,6 @@ append-only audit log.
   drafft-backend. Roles: support, moderator, admin.
 - Moderation focus: no usage or growth statistics in this product.
 - Conversations come from Stream Chat; media from the media CDN; selfies through 5-minute signed links.
-- Local demo data (`scripts/demo.sh`) for trying every case without real members.
 
 ## Brand Commitments
 
@@ -63,7 +62,7 @@ append-only audit log.
 
 ## Evidence on Hand
 
-No real member data in the repository. Demo accounts and pictures only, local database only.
+No real member data in the repository. Try cases on throwaway accounts in staging.
 
 ## Product Principles
 

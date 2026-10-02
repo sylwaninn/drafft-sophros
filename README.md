@@ -38,8 +38,8 @@ flowchart LR
    a 403.
 2. **Access.** The Worker reads the Access token (`cf-access-jwt-assertion` header or `CF_Authorization`
    cookie) and verifies it against the team's keys: issuer, audience (`ACCESS_AUD`), RS256, expiry. A missing
-   or invalid token gets a 401. Locally, `AUTH_MODE=dev` replaces this step with `DEV_STAFF_EMAIL`, on
-   localhost only (see [Getting started](#getting-started)).
+   or invalid token gets a 401. On the dev server, `AUTH_MODE=dev` replaces this step with `DEV_STAFF_EMAIL`,
+   on localhost only (see [Getting started](#getting-started)).
 3. **Staff.** `admin_whoami(email)` returns the person's role in this environment's database; no role, a 403.
 4. **Headers.** HTML gets a Content-Security-Policy with a fresh nonce; every response gets `DENY` framing, no
    referrer, `noindex`, HSTS, and `private, no-store` unless the route sets its own cache rule. The `/live`
@@ -107,25 +107,22 @@ The sidebar's labels:
 
 ## Getting started
 
-Runs against the local Supabase of drafft-backend, whose migrations hold the `admin_*` functions.
+The dev server runs on your machine and works against the staging project of drafft-backend, whose
+migrations hold the `admin_*` functions. There is no local database.
 
 ```sh
-(cd ../drafft-backend && supabase start)   # first start or `supabase db reset` seeds dev@drafft.local as admin
 pnpm install
-scripts/local-env.sh                       # writes .dev.vars (local service role key)
-pnpm dev                                   # http://localhost:5173
+cp .dev.vars.example .dev.vars   # then fill it in by hand: staging's secret key, Stream's staging key and secret, your staff email
+pnpm dev                         # http://localhost:5173
 ```
 
-Locally `AUTH_MODE=dev` signs you in as `DEV_STAFF_EMAIL` without Access; the Worker refuses that mode outside
-`local` and answers it on localhost only. Real conversations need the Stream staging key and secret in
-`.dev.vars`; without them, conversations show canned demo messages.
+On the dev server `AUTH_MODE=dev` signs you in as `DEV_STAFF_EMAIL` without Access; the Worker refuses that
+mode unless `DRAFFT_ENV=dev` and answers it on localhost only. `DEV_STAFF_EMAIL` must be on staging's staff
+list (`private.staff`). Conversations need the Stream staging key and secret in `.dev.vars`.
 
-Actions here really happen on the database the iOS `Drafft Local` scheme and the Android local build use: holds
-reach the app live, and lifting a hold deletes the selfies and emails the person.
-
-`scripts/demo.sh up` adds 14 local accounts covering every case (a ban and a new account on the same phone, a
-selfie to compare, reports, flagged chat photos, support requests); `scripts/demo.sh down` removes them. They go
-in with triggers off (no email, push, Stream or R2 call) and never show in the apps' Discover.
+Actions here really happen on the staging database, the one the apps' staging builds use: holds reach the
+app live, and lifting a hold deletes the selfies and emails the person. Never point the dev server at
+production.
 
 | Command       | What                                                          |
 | ------------- | ------------------------------------------------------------- |
